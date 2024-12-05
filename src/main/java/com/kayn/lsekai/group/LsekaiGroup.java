@@ -19,7 +19,7 @@ public class LsekaiGroup {
 
     public static final ItemGroup LSEKAI = Registry.register(
             Registries.ITEM_GROUP,
-            new Identifier(Lsekai.MOD_ID,"mcs"),
+            new Identifier(Lsekai.MOD_ID,"lsekai"),
             FabricItemGroup.builder()
                     .displayName(Text.translatable("itemGroup.lsekai"))
                     .entries(LsekaiGroup::addItems)
