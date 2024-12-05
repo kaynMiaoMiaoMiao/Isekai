@@ -3,7 +3,7 @@
 	"package": "com.kayn.lsekai.mixin",
 	"compatibilityLevel": "JAVA_17",
 	"mixins": [
-		"ExampleMixin"
+      "LsekaiMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

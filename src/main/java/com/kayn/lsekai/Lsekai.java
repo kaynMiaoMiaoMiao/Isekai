@@ -1,6 +1,7 @@
 package com.kayn.lsekai;
 
 import com.kayn.lsekai.group.LsekaiGroup;
+import com.kayn.lsekai.item.LsekaiItem;
 import net.fabricmc.api.ModInitializer;
 
 import org.slf4j.Logger;
@@ -15,9 +16,9 @@ public class Lsekai implements ModInitializer {
 	@Override
 	public void onInitialize() {
 
+		LsekaiItem.initialize();
 
 		LsekaiGroup.initialize();
-
 
 		LOGGER.info("Hello Fabric world!");
 
