@@ -1,6 +1,6 @@
 {
 	"schemaVersion": 1,
-	"id": "Isekai",
+	"id": "isekai",
 	"version": "${version}",
 	"name": "Isekai",
 	"description": "Ciallo",
@@ -12,17 +12,17 @@
 		"sources": "https://github.com/FabricMC/fabric-example-mod"
 	},
 	"license": "CC0-1.0",
-	"icon": "assets/Isekai/icon.png",
+	"icon": "assets/isekai/icon.png",
 	"environment": "*",
 	"entrypoints": {
 		"main": [
-			"com.kayn.Isekai.Isekai"
+			"com.kayn.isekai.Isekai"
 		],
 		"client": [
-			"com.kayn.Isekai.LsekaiClient"
+			"com.kayn.isekai.IsekaiClient"
 		],
 		"fabric-datagen": [
-			"com.kayn.Isekai.LsekaiDataGenerator"
+			"com.kayn.isekai.IsekaiDataGenerator"
 		]
 	},
 	"mixins": [

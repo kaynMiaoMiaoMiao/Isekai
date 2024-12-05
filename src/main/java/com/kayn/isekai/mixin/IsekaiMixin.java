@@ -1,4 +1,4 @@
-package com.kayn.Isekai.mixin;
+package com.kayn.isekai.mixin;
 
 import net.minecraft.server.MinecraftServer;
 import org.spongepowered.asm.mixin.Mixin;

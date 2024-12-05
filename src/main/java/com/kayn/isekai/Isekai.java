@@ -1,7 +1,8 @@
-package com.kayn.Isekai;
+package com.kayn.isekai;
 
-import com.kayn.Isekai.group.LsekaiGroup;
-import com.kayn.Isekai.item.LsekaiItem;
+
+import com.kayn.isekai.group.IsekaiGroup;
+import com.kayn.isekai.item.IsekaiItem;
 import net.fabricmc.api.ModInitializer;
 
 import org.slf4j.Logger;
@@ -9,16 +10,16 @@ import org.slf4j.LoggerFactory;
 
 public class Isekai implements ModInitializer {
 
-	public static final String MOD_ID = "Isekai";
+	public static final String MOD_ID = "isekai";
 
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
 	@Override
 	public void onInitialize() {
 
-		LsekaiItem.initialize();
+		IsekaiItem.initialize();
 
-		LsekaiGroup.initialize();
+		IsekaiGroup.initialize();
 
 		LOGGER.info("Hello Fabric world!");
 

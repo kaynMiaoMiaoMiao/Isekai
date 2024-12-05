@@ -1,6 +1,6 @@
-package com.kayn.Isekai.item;
+package com.kayn.isekai.item;
 
-import com.kayn.Isekai.Isekai;
+import com.kayn.isekai.Isekai;
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
 import net.minecraft.item.Item;
@@ -15,7 +15,7 @@ import net.minecraft.util.Identifier;
  * @author: kayn
  * 2024-12-05 13:54
  **/
-public class LsekaiItem {
+public class IsekaiItem {
 
     public static final Item GRAMME_COIN = register(new Item(new Item.Settings()), "gramme_coin");
 
@@ -31,7 +31,7 @@ public class LsekaiItem {
         Event<ItemGroupEvents.ModifyEntries> modifyEntriesEvent = ItemGroupEvents.modifyEntriesEvent(ItemGroups.INGREDIENTS);
 
         modifyEntriesEvent.register((itemGroup) -> {
-            itemGroup.add(LsekaiItem.GRAMME_COIN);
+            itemGroup.add(IsekaiItem.GRAMME_COIN);
         });
 
     }

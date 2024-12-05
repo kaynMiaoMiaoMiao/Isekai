@@ -1,9 +1,9 @@
 {
 	"required": true,
-	"package": "com.kayn.Isekai.mixin",
+	"package": "com.kayn.isekai.mixin",
 	"compatibilityLevel": "JAVA_17",
 	"mixins": [
-      "LsekaiMixin"
+      "IsekaiMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
