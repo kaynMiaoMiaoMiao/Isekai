@@ -1,5 +1,5 @@
 <p align="center">
-	<img width="1280" alt="logo" src="http://115.190.20.248:9000/lsekai/icon%2Fai.jpg">
+	<img alt="logo" src="http://115.190.20.248:9000/lsekai/icon%2Fyuanshen.jpg">
 </p>
 <h1 align="center" style="margin: 30px 0 30px; font-weight: bold;">Lsekai</h1>
 <h4 align="center">Lsekai</h4>
