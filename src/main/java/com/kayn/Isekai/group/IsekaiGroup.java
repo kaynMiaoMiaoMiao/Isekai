@@ -1,7 +1,7 @@
-package com.kayn.lsekai.group;
+package com.kayn.Isekai.group;
 
-import com.kayn.lsekai.Lsekai;
-import com.kayn.lsekai.item.LsekaiItem;
+import com.kayn.Isekai.Isekai;
+import com.kayn.Isekai.item.LsekaiItem;
 import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroup;
 import net.minecraft.item.ItemGroup;
 import net.minecraft.registry.Registries;
@@ -19,9 +19,9 @@ public class LsekaiGroup {
 
     public static final ItemGroup LSEKAI = Registry.register(
             Registries.ITEM_GROUP,
-            new Identifier(Lsekai.MOD_ID,"lsekai"),
+            new Identifier(Isekai.MOD_ID,"Isekai"),
             FabricItemGroup.builder()
-                    .displayName(Text.translatable("itemGroup.lsekai"))
+                    .displayName(Text.translatable("itemGroup.Isekai"))
                     .entries(LsekaiGroup::addItems)
                     .icon(LsekaiItem.GRAMME_COIN::getDefaultStack)
                     .build()

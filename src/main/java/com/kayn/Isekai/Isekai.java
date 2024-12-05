@@ -1,15 +1,15 @@
-package com.kayn.lsekai;
+package com.kayn.Isekai;
 
-import com.kayn.lsekai.group.LsekaiGroup;
-import com.kayn.lsekai.item.LsekaiItem;
+import com.kayn.Isekai.group.LsekaiGroup;
+import com.kayn.Isekai.item.LsekaiItem;
 import net.fabricmc.api.ModInitializer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class Lsekai implements ModInitializer {
+public class Isekai implements ModInitializer {
 
-	public static final String MOD_ID = "lsekai";
+	public static final String MOD_ID = "Isekai";
 
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 

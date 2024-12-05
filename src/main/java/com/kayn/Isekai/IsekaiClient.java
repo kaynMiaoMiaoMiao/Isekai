@@ -1,4 +1,4 @@
-package com.kayn.lsekai;
+package com.kayn.Isekai;
 
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.ModInitializer;

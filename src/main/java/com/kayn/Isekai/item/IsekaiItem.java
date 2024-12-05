@@ -1,6 +1,6 @@
-package com.kayn.lsekai.item;
+package com.kayn.Isekai.item;
 
-import com.kayn.lsekai.Lsekai;
+import com.kayn.Isekai.Isekai;
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
 import net.minecraft.item.Item;
@@ -21,7 +21,7 @@ public class LsekaiItem {
 
     private static Item register(Item item, String id) {
 
-        Identifier itemIdentifier = new Identifier(Lsekai.MOD_ID, id);
+        Identifier itemIdentifier = new Identifier(Isekai.MOD_ID, id);
 
         return Registry.register(Registries.ITEM, itemIdentifier, item);
     }
