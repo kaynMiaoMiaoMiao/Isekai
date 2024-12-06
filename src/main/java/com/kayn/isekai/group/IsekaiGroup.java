@@ -29,6 +29,7 @@ public class IsekaiGroup {
 
     public static void addItems(ItemGroup.DisplayContext displayContext, ItemGroup.Entries entries) {
         entries.add(IsekaiItem.GRAMME_COIN);
+        entries.add(IsekaiItem.BIRD6_SPAWN_EGG);
     }
 
     public static void initialize(){

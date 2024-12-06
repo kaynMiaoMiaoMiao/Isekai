@@ -1,10 +1,14 @@
 package com.kayn.isekai;
 
 
+import com.kayn.isekai.data.ModWorldGenerator;
+import com.kayn.isekai.entity.IsekaiEntity;
+import com.kayn.isekai.entity.custom.Bird6Entity;
 import com.kayn.isekai.group.IsekaiGroup;
 import com.kayn.isekai.item.IsekaiItem;
 import net.fabricmc.api.ModInitializer;
 
+import net.fabricmc.fabric.api.object.builder.v1.entity.FabricDefaultAttributeRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,6 +25,9 @@ public class Isekai implements ModInitializer {
 
 		IsekaiGroup.initialize();
 
+		ModWorldGenerator.generateModWorldGen();
+
+		FabricDefaultAttributeRegistry.register(IsekaiEntity.BIRD6, Bird6Entity.createBirdAttributes());
 		LOGGER.info("Hello Fabric world!");
 
 	}
