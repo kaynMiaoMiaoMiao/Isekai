@@ -49,8 +49,6 @@ public class Bird6Entity extends AnimalEntity implements GeoEntity {
 
         this.goalSelector.add(4,new LookAroundGoal(this));
 
-        this.goalSelector.add(2,new ActiveTargetGoal<>(this, PlayerEntity.class, true));
-        this.goalSelector.add(2,new ActiveTargetGoal<>(this, MerchantEntity.class, true));
         this.goalSelector.add(3,new ActiveTargetGoal<>(this, ChickenEntity.class, true));
     }
 
