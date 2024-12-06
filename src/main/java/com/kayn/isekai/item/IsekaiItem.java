@@ -33,21 +33,21 @@ public class IsekaiItem {
     );
 
 
-    private static Item register(Item item, String id) {
+    private static Item register(Item item, String name) {
 
-        Identifier itemIdentifier = new Identifier(Isekai.MOD_ID, id);
+        Identifier itemIdentifier = new Identifier(Isekai.MOD_ID, name);
 
         return Registry.register(Registries.ITEM, itemIdentifier, item);
     }
 
     public static void initialize(){
 
-        Event<ItemGroupEvents.ModifyEntries> modifyEntriesEvent = ItemGroupEvents.modifyEntriesEvent(ItemGroups.INGREDIENTS);
-
-        modifyEntriesEvent.register((itemGroup) -> {
-            itemGroup.add(IsekaiItem.GRAMME_COIN);
-            itemGroup.add(IsekaiItem.BIRD6_SPAWN_EGG);
-        });
+//        Event<ItemGroupEvents.ModifyEntries> modifyEntriesEvent = ItemGroupEvents.modifyEntriesEvent(ItemGroups.INGREDIENTS);
+//
+//        modifyEntriesEvent.register((itemGroup) -> {
+//            itemGroup.add(IsekaiItem.GRAMME_COIN);
+//            itemGroup.add(IsekaiItem.BIRD6_SPAWN_EGG);
+//        });
 
     }
 
