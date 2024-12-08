@@ -23,7 +23,7 @@ public class IsekaiEntity {
             new Identifier(Isekai.MOD_ID,"bird6"),
 
             FabricEntityTypeBuilder.create(SpawnGroup.CREATURE, Bird6Entity::new)
-                    .dimensions(EntityDimensions.fixed(1.5f,1.75f))
+                    .dimensions(EntityDimensions.fixed(1.0f,1.0f))
                     .build()
     );
 
