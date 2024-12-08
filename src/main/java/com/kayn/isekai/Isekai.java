@@ -1,7 +1,6 @@
 package com.kayn.isekai;
 
 
-import com.kayn.isekai.data.ModWorldGenerator;
 import com.kayn.isekai.entity.IsekaiEntity;
 import com.kayn.isekai.entity.custom.Bird6Entity;
 import com.kayn.isekai.group.IsekaiGroup;
@@ -25,7 +24,6 @@ public class Isekai implements ModInitializer {
 
 		IsekaiGroup.initialize();
 
-		ModWorldGenerator.generateModWorldGen();
 
 		FabricDefaultAttributeRegistry.register(IsekaiEntity.BIRD6, Bird6Entity.createBirdAttributes());
 		LOGGER.info("Hello Fabric world!");

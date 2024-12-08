@@ -2,11 +2,8 @@ package com.kayn.isekai.item;
 
 import com.kayn.isekai.Isekai;
 import com.kayn.isekai.entity.IsekaiEntity;
-import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.item.v1.FabricItemSettings;
-import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
 import net.minecraft.item.Item;
-import net.minecraft.item.ItemGroups;
 import net.minecraft.item.SpawnEggItem;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
@@ -25,8 +22,8 @@ public class IsekaiItem {
     public static final Item BIRD6_SPAWN_EGG = register(
             new SpawnEggItem(
                     IsekaiEntity.BIRD6,
-                    0xD57E36,
-                    0x1D0D00,
+                    0xF8F8FF,
+                    0xe3773f,
                     new FabricItemSettings()
             ),
             "bird6_spawn_egg"
