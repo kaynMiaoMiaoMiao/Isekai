@@ -59,14 +59,14 @@ public class Bird6Entity extends AbstractHorseEntity implements GeoEntity {
     protected void initAttributes(Random random) {
         this.getAttributeInstance(EntityAttributes.GENERIC_MAX_HEALTH).setBaseValue(30);
         this.getAttributeInstance(EntityAttributes.GENERIC_MOVEMENT_SPEED).setBaseValue(0.3f);
-        this.getAttributeInstance(EntityAttributes.HORSE_JUMP_STRENGTH).setBaseValue(2.0f);
+        this.getAttributeInstance(EntityAttributes.HORSE_JUMP_STRENGTH).setBaseValue(0.5f);
     }
 
     public static DefaultAttributeContainer.Builder createBirdAttributes() {
         return AnimalEntity.createMobAttributes()
                 .add(EntityAttributes.GENERIC_MAX_HEALTH, 30)
                 .add(EntityAttributes.GENERIC_MOVEMENT_SPEED, 0.3f)
-                .add(EntityAttributes.HORSE_JUMP_STRENGTH, 2.0f)
+                .add(EntityAttributes.HORSE_JUMP_STRENGTH, 0.5f)
                 ;
     }
 
