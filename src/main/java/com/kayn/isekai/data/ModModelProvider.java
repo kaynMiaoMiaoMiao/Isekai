@@ -9,21 +9,17 @@ import net.minecraft.data.client.ModelIds;
 
 public class ModModelProvider extends FabricModelProvider {
 
-        public ModModelProvider(FabricDataOutput output) {
-            super(output);
-        }
-
-        @Override
-        public void generateBlockStateModels(BlockStateModelGenerator blockStateModelGenerator) {
-
-            // 填充方块状态模型生成逻辑（如果有方块需要模型）
-            blockStateModelGenerator.registerParentedItemModel(IsekaiItem.BIRD6_SPAWN_EGG, ModelIds.getMinecraftNamespacedItem("template_spawn_egg"));
-        }
-
-        @Override
-        public void generateItemModels(ItemModelGenerator itemModelGenerator) {
-
-            // 填充物品模型生成逻辑
-            // itemModelGenerator.register(IsekaiItem.BIRD6_SPAWN_EGG, Models.GENERATED);
-        }
+    public ModModelProvider(FabricDataOutput output) {
+        super(output);
     }
+
+    @Override
+    public void generateBlockStateModels(BlockStateModelGenerator generator) {
+        generator.registerParentedItemModel(
+                IsekaiItem.LAND_BIRD_SPAWN_EGG, ModelIds.getMinecraftNamespacedItem("template_spawn_egg"));
+    }
+
+    @Override
+    public void generateItemModels(ItemModelGenerator generator) {
+    }
+}

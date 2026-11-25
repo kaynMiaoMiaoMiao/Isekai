@@ -3,13 +3,12 @@
 	"id": "isekai",
 	"version": "${version}",
 	"name": "Isekai",
-	"description": "Ciallo",
+	"description": "A Fabric mod featuring land birds, tameable and breedable mounts.",
 	"authors": [
 		"kayn"
 	],
 	"contact": {
-		"homepage": "https://fabricmc.net/",
-		"sources": "https://github.com/FabricMC/fabric-example-mod"
+		"sources": "https://github.com/kaynMiaoMiaoMiao/Isekai"
 	},
 	"license": "CC0-1.0",
 	"icon": "assets/isekai/icon.png",
@@ -25,17 +24,11 @@
 			"com.kayn.isekai.IsekaiDataGenerator"
 		]
 	},
-	"mixins": [
-		"Isekai.mixins.json"
-	],
 	"depends": {
 		"fabricloader": ">=0.16.9",
 		"minecraft": "~1.20.1",
 		"java": ">=17",
 		"geckolib": ">=4.4.9",
 		"fabric-api": "*"
-	},
-	"suggests": {
-		"another-mod": "*"
 	}
 }

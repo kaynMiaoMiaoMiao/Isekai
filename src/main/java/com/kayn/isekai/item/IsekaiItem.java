@@ -1,51 +1,42 @@
 package com.kayn.isekai.item;
 
 import com.kayn.isekai.Isekai;
+import com.kayn.isekai.block.IsekaiBlock;
 import com.kayn.isekai.entity.IsekaiEntity;
-import net.fabricmc.fabric.api.item.v1.FabricItemSettings;
+import net.minecraft.item.BlockItem;
 import net.minecraft.item.Item;
 import net.minecraft.item.SpawnEggItem;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
-import net.minecraft.util.Identifier;
 
-/**
- * desc
- *
- * @author: kayn
- * 2024-12-05 13:54
- **/
-public class IsekaiItem {
+import java.util.List;
 
-    public static final Item GRAMME_COIN = register(new Item(new Item.Settings()), "gramme_coin");
+public final class IsekaiItem {
 
-    public static final Item BIRD6_SPAWN_EGG = register(
-            new SpawnEggItem(
-                    IsekaiEntity.BIRD6,
-                    0xF8F8FF,
-                    0xe3773f,
-                    new FabricItemSettings()
-            ),
-            "bird6_spawn_egg"
+    public static final Item GRAMME_COIN = register("gramme_coin", new Item(new Item.Settings()));
+
+    public static final Item LAND_BIRD_SPAWN_EGG = register(
+            "land_bird_spawn_egg",
+            new SpawnEggItem(IsekaiEntity.LAND_BIRD, 0xF8F8FF, 0xE3773F, new Item.Settings())
     );
 
+    public static final List<Item> LAND_BIRD_EGGS = IsekaiBlock.LAND_BIRD_EGGS.stream()
+            .map(block -> register(IsekaiBlock.eggPath(block.getPlumage()),
+                    new BlockItem(block, new Item.Settings().maxCount(16))))
+            .toList();
 
-    private static Item register(Item item, String name) {
-
-        Identifier itemIdentifier = new Identifier(Isekai.MOD_ID, name);
-
-        return Registry.register(Registries.ITEM, itemIdentifier, item);
+    public static Item egg(int plumage) {
+        return LAND_BIRD_EGGS.get(plumage - 1);
     }
 
-    public static void initialize(){
-
-//        Event<ItemGroupEvents.ModifyEntries> modifyEntriesEvent = ItemGroupEvents.modifyEntriesEvent(ItemGroups.INGREDIENTS);
-//
-//        modifyEntriesEvent.register((itemGroup) -> {
-//            itemGroup.add(IsekaiItem.GRAMME_COIN);
-//            itemGroup.add(IsekaiItem.BIRD6_SPAWN_EGG);
-//        });
-
+    private IsekaiItem() {
     }
 
+    private static Item register(String path, Item item) {
+        return Registry.register(Registries.ITEM, Isekai.id(path), item);
+    }
+
+    public static void initialize() {
+        // Calling this method initializes the item registrations above.
+    }
 }

@@ -1,7 +1,17 @@
 {
   "item.isekai.gramme_coin": "Gramme Coin",
-  "item.isekai.bird6_spawn_egg": "bird6 egg",
+  "item.isekai.land_bird_spawn_egg": "Land Bird Spawn Egg",
   "itemGroup.isekai": "Isekai",
-  "entity.isekai.bird6" : "bird6"
-
+  "entity.isekai.land_bird": "Land Bird",
+  "block.isekai.land_bird_egg": "Red Land Bird Egg",
+  "block.isekai.land_bird_egg_2": "Blue Land Bird Egg",
+  "block.isekai.land_bird_egg_3": "Rose Land Bird Egg",
+  "block.isekai.land_bird_egg_4": "Jade Land Bird Egg",
+  "block.isekai.land_bird_egg_5": "Dark Violet Land Bird Egg",
+  "block.isekai.land_bird_egg_6": "Silver Blue Land Bird Egg",
+  "mode.isekai.land_bird.roam": "Roaming",
+  "mode.isekai.land_bird.sit": "Sitting",
+  "mode.isekai.land_bird.follow": "Following",
+  "message.isekai.land_bird.mode": "Land bird mode: %s",
+  "message.isekai.land_bird_egg.progress": "Incubation: %s / %s seconds"
 }
