@@ -1,0 +1,4 @@
+accessWidener v2 named
+# LandBirdEntity reads whether its rider holds the jump key (gliding). AbstractHorseEntity shadows this
+# field with its own `jumping`, and the rider is a PlayerEntity, so the protected field is out of reach.
+accessible field net/minecraft/entity/LivingEntity jumping Z

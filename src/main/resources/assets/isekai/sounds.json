@@ -1,7 +1,7 @@
 {
   "entity.land_bird.ambient": {
     "subtitle": "subtitles.isekai.entity.land_bird.ambient",
-    "sounds": ["isekai:entity/land_bird/ambient1", "isekai:entity/land_bird/ambient2", "isekai:entity/land_bird/ambient3"]
+    "sounds": ["isekai:entity/land_bird/ambient1", "isekai:entity/land_bird/ambient2", "isekai:entity/land_bird/ambient3", "isekai:entity/land_bird/ambient4", "isekai:entity/land_bird/ambient5"]
   },
   "entity.land_bird.hurt": {
     "subtitle": "subtitles.isekai.entity.land_bird.hurt",
@@ -21,7 +21,7 @@
   },
   "entity.land_bird.step": {
     "subtitle": "subtitles.isekai.entity.land_bird.step",
-    "sounds": ["isekai:entity/land_bird/step1", "isekai:entity/land_bird/step2", "isekai:entity/land_bird/step3"]
+    "sounds": ["isekai:entity/land_bird/step1", "isekai:entity/land_bird/step2", "isekai:entity/land_bird/step3", "isekai:entity/land_bird/step4"]
   },
   "entity.land_bird.jump": {
     "subtitle": "subtitles.isekai.entity.land_bird.jump",
@@ -30,5 +30,9 @@
   "entity.land_bird.land": {
     "subtitle": "subtitles.isekai.entity.land_bird.land",
     "sounds": ["isekai:entity/land_bird/land"]
+  },
+  "entity.land_bird.flap": {
+    "subtitle": "subtitles.isekai.entity.land_bird.flap",
+    "sounds": ["isekai:entity/land_bird/flap1", "isekai:entity/land_bird/flap2", "isekai:entity/land_bird/flap3"]
   }
 }

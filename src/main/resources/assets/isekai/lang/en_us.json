@@ -22,6 +22,7 @@
   "subtitles.isekai.entity.land_bird.step": "Footsteps",
   "subtitles.isekai.entity.land_bird.jump": "Land Bird flaps",
   "subtitles.isekai.entity.land_bird.land": "Land Bird lands",
+  "subtitles.isekai.entity.land_bird.flap": "Land Bird wings beat",
   "message.isekai.land_bird_egg.progress_blocked": "Incubating: %s%%, about %s left. The space above the egg is blocked, so it won't be able to hatch",
   "message.isekai.land_bird_egg.paused": "Incubation paused at %s%%: no heat source within 3 blocks",
   "message.isekai.land_bird_egg.cold": "The egg is cold. Place a lit campfire, fire, soul fire, lava or magma block within 3 blocks to incubate it",

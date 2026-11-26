@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """Procedurally synthesize the land bird's sound effects.
 
-Pure standard library: every clip is built from oscillators, noise and simple
-filters, then written as WAV and (if `oggenc` from vorbis-tools is installed)
-encoded to the Ogg Vorbis files Minecraft loads.
+Pure standard library: every clip is built from oscillators, noise and simple filters, then written as
+WAV and (if `oggenc` from vorbis-tools is installed) encoded to the Ogg Vorbis files Minecraft loads.
+
+Sound design: a large, gentle fantasy bird. Calls are warm and rounded (soft harmonic roll-off, low
+formants, a slightly detuned second voice and a little room reverb) rather than buzzy; footsteps are
+padded thuds built from filtered noise, with no pitched ringing; wing beats are soft rushes of air.
+Clips are levelled by loudness (RMS) as well as peak, so quiet sounds stay quiet.
 
 Usage:
     python3 tools/land_bird_sounds.py            # writes into the mod's assets
@@ -48,7 +52,7 @@ def envelope(n, attack, release, curve=2.0):
     out = []
     for i in range(n):
         if i < a:
-            g = i / a
+            g = math.sin(i / a * math.pi / 2)  # smooth onset
         elif i > n - r:
             g = max(0.0, (n - i) / r) ** curve
         else:
@@ -57,46 +61,109 @@ def envelope(n, attack, release, curve=2.0):
     return out
 
 
+def apply_env(sig, env):
+    return [v * e for v, e in zip(sig, env)]
+
+
 def noise(n, rng):
     return [rng.uniform(-1.0, 1.0) for _ in range(n)]
+
+
+def biquad(sig, b0, b1, b2, a1, a2):
+    x1 = x2 = y1 = y2 = 0.0
+    out = []
+    for x in sig:
+        y = b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2
+        x2, x1, y2, y1 = x1, x, y1, y
+        out.append(y)
+    return out
 
 
 def bandpass(sig, freq, q):
     w0 = 2 * math.pi * freq / SR
     alpha = math.sin(w0) / (2 * q)
     a0 = 1 + alpha
-    b0, b2 = alpha / a0, -alpha / a0
-    a1, a2 = -2 * math.cos(w0) / a0, (1 - alpha) / a0
-    x1 = x2 = y1 = y2 = 0.0
+    return biquad(sig, alpha / a0, 0.0, -alpha / a0, -2 * math.cos(w0) / a0, (1 - alpha) / a0)
+
+
+def lowpass(sig, cutoff, q=0.707):
+    w0 = 2 * math.pi * cutoff / SR
+    alpha = math.sin(w0) / (2 * q)
+    c = math.cos(w0)
+    a0 = 1 + alpha
+    return biquad(sig, (1 - c) / 2 / a0, (1 - c) / a0, (1 - c) / 2 / a0, -2 * c / a0, (1 - alpha) / a0)
+
+
+def highpass(sig, cutoff, q=0.707):
+    w0 = 2 * math.pi * cutoff / SR
+    alpha = math.sin(w0) / (2 * q)
+    c = math.cos(w0)
+    a0 = 1 + alpha
+    return biquad(sig, (1 + c) / 2 / a0, -(1 + c) / a0, (1 + c) / 2 / a0, -2 * c / a0, (1 - alpha) / a0)
+
+
+def sweep_bandpass(sig, f_start, f_end, q):
+    """Band-pass whose centre glides (exponentially) across the clip: wing rushes."""
     out = []
-    for x in sig:
+    x1 = x2 = y1 = y2 = 0.0
+    n = len(sig)
+    for i, x in enumerate(sig):
+        f = f_start * (f_end / f_start) ** (i / max(1, n - 1))
+        w0 = 2 * math.pi * f / SR
+        alpha = math.sin(w0) / (2 * q)
+        a0 = 1 + alpha
+        b0, b2 = alpha / a0, -alpha / a0
+        a1, a2 = -2 * math.cos(w0) / a0, (1 - alpha) / a0
         y = b0 * x + b2 * x2 - a1 * y1 - a2 * y2
         x2, x1, y2, y1 = x1, x, y1, y
         out.append(y)
     return out
 
 
-def lowpass(sig, cutoff):
-    k = 1 - math.exp(-2 * math.pi * cutoff / SR)
-    y = 0.0
-    out = []
-    for x in sig:
-        y += k * (x - y)
-        out.append(y)
-    return out
+def reverb(sig, wet=0.18, room=0.72, damp=0.35, tail=0.45):
+    """Small Schroeder room: four damped combs into two all-passes."""
+    sig = sig + silence(tail)
+    combs = (0.0297, 0.0371, 0.0411, 0.0437)
+    out = [0.0] * len(sig)
+    for d in combs:
+        delay = int(d * SR)
+        buf = [0.0] * delay
+        idx = 0
+        lp = 0.0
+        for i, x in enumerate(sig):
+            y = buf[idx]
+            lp = y * (1 - damp) + lp * damp
+            buf[idx] = x + lp * room
+            idx = (idx + 1) % delay
+            out[i] += y / len(combs)
+    for d, g in ((0.005, 0.7), (0.0017, 0.7)):
+        delay = int(d * SR)
+        buf = [0.0] * delay
+        idx = 0
+        res = []
+        for x in out:
+            b = buf[idx]
+            y = -g * x + b
+            buf[idx] = x + g * y
+            idx = (idx + 1) % delay
+            res.append(y)
+        out = res
+    return [d * (1 - wet) + w * wet for d, w in zip(sig, out)]
 
 
-def highpass(sig, cutoff):
-    low = lowpass(sig, cutoff)
-    return [x - l for x, l in zip(sig, low)]
+def rms(sig):
+    return math.sqrt(sum(v * v for v in sig) / max(1, len(sig)))
 
 
-def normalize(sig, peak):
+def level(sig, peak, loudness):
+    """Scale to the lower of a peak and an RMS target, so dense clips do not end up louder."""
     m = max((abs(v) for v in sig), default=0.0) or 1.0
-    return [v * peak / m for v in sig]
+    r = rms(sig) or 1.0
+    g = min(peak / m, loudness / r)
+    return [v * g for v in sig]
 
 
-def fade_edges(sig, seconds=0.004):
+def fade_edges(sig, seconds=0.006):
     n = min(len(sig) // 2, int(seconds * SR))
     for i in range(n):
         g = i / n
@@ -105,44 +172,48 @@ def fade_edges(sig, seconds=0.004):
     return sig
 
 
-# ------------------------------------------------------------------- voices
+# ------------------------------------------------------------------- voice
 
-def voice(seconds, pitch, rng, *, formants=((900, 4, 1.0), (2300, 6, 0.55)),
-          vibrato=(0.0, 0.0), rough=(0.0, 0.0), breath=0.08,
-          attack=0.02, release=0.08):
-    """A buzzy syrinx-like tone shaped by vocal formants.
+def voice(seconds, pitch, rng, *, formants=((620, 2.2, 1.0), (1500, 3.0, 0.45), (2700, 4.0, 0.12)),
+          vibrato=(5.5, 0.012), trill=(0.0, 0.0), breath=0.05, tilt=1.6, detune=0.006,
+          attack=0.04, release=0.12):
+    """Warm syrinx-like call: soft harmonics (1/k^tilt) through vocal formants, doubled by a slightly
+    detuned second voice for a gentle shimmer.
 
-    pitch: f(progress 0..1) -> Hz
-    vibrato: (rate Hz, depth fraction)
-    rough: (AM rate Hz, depth 0..1) for squawky, gravelly calls
+    pitch: f(progress 0..1) -> Hz; vibrato: (rate Hz, depth fraction); trill: (rate Hz, depth 0..1)
     """
     n = int(seconds * SR)
-    phase = 0.0
-    src = []
     vib_rate, vib_depth = vibrato
-    rough_rate, rough_depth = rough
-    for i in range(n):
-        t = i / SR
-        p = i / n
-        f = pitch(p) * (1 + vib_depth * math.sin(2 * math.pi * vib_rate * t))
-        phase += 2 * math.pi * f / SR
-        harmonics = max(1, min(14, int(6000 / f)))
-        s = 0.0
-        for k in range(1, harmonics + 1):
-            s += math.sin(k * phase) / (k ** 1.15)
-        if rough_depth:
-            s *= 1 - rough_depth * (0.5 + 0.5 * math.sin(2 * math.pi * rough_rate * t
-                                                         + rng.uniform(-0.4, 0.4)))
-        src.append(s)
-    src = [s + breath * rng.uniform(-1, 1) * 4 for s in src]
+    trill_rate, trill_depth = trill
+    drift = [rng.uniform(-1, 1) for _ in range(8)]
+    src = [0.0] * n
+    for voice_i, cents in enumerate((0.0, detune)):
+        phase = rng.uniform(0, 2 * math.pi)
+        gain = 1.0 if voice_i == 0 else 0.55
+        for i in range(n):
+            t = i / SR
+            p = i / n
+            # slow random pitch drift keeps the call alive
+            seg = p * (len(drift) - 1)
+            k = int(seg)
+            wobble = drift[k] + (drift[min(k + 1, len(drift) - 1)] - drift[k]) * (seg - k)
+            f = pitch(p) * (1 + cents) * (1 + vib_depth * math.sin(2 * math.pi * vib_rate * t) + 0.004 * wobble)
+            phase += 2 * math.pi * f / SR
+            harmonics = max(1, min(10, int(4500 / f)))
+            s = 0.0
+            for h in range(1, harmonics + 1):
+                s += math.sin(h * phase) / (h ** tilt)
+            if trill_depth:
+                s *= 1 - trill_depth * (0.5 + 0.5 * math.sin(2 * math.pi * trill_rate * t))
+            src[i] += s * gain
+    air = lowpass(noise(n, rng), 2200)
+    src = [s + breath * 6 * a for s, a in zip(src, air)]
     out = [0.0] * n
-    for freq, q, gain in formants:
+    for freq, q, g in formants:
         for i, v in enumerate(bandpass(src, freq, q)):
-            out[i] += v * gain
-    dry = 0.12
-    out = [o + dry * s for o, s in zip(out, src)]
-    env = envelope(n, attack, release)
-    return [o * e for o, e in zip(out, env)]
+            out[i] += v * g
+    out = [o + 0.18 * s for o, s in zip(out, lowpass(src, 1800))]
+    return apply_env(out, envelope(n, attack, release))
 
 
 def glide(start, end, shape=1.0):
@@ -153,154 +224,189 @@ def expo(start, end):
     return lambda p: start * (end / start) ** p
 
 
-def arch(low, high, low_end=None):
+def arch(low, high, low_end=None, peak=0.4):
     low_end = low if low_end is None else low_end
+
     def f(p):
-        if p < 0.4:
-            return low + (high - low) * math.sin(p / 0.4 * math.pi / 2)
-        return high + (low_end - high) * ((p - 0.4) / 0.6) ** 1.3
+        if p < peak:
+            return low + (high - low) * math.sin(p / peak * math.pi / 2)
+        return high + (low_end - high) * ((p - peak) / (1 - peak)) ** 1.3
     return f
 
 
-# ------------------------------------------------------------------- clips
+def notes(*segments):
+    """Legato phrase: (start Hz, end Hz, share of the clip)."""
+    total = sum(s for _, _, s in segments)
+
+    def f(p):
+        acc = 0.0
+        for a, b, s in segments:
+            share = s / total
+            if p <= acc + share:
+                q = (p - acc) / share
+                q = q * q * (3 - 2 * q)  # ease between notes
+                return a + (b - a) * q
+            acc += share
+        return segments[-1][1]
+    return f
+
+
+# ------------------------------------------------------------------- calls
 
 def ambient1(rng):
-    """Two-syllable 'kru-ruu' greeting."""
-    out = silence(0.0)
-    mix(out, voice(0.17, glide(520, 700), rng, release=0.05))
-    mix(out, voice(0.38, arch(690, 760, 470), rng, vibrato=(17, 0.04)), 0.22)
+    """'Kweh-roo': a soft rising coo answered by a warm falling note (a fourth apart)."""
+    out = voice(0.16, glide(392, 470), rng, release=0.05)
+    mix(out, voice(0.42, arch(523, 560, 392, 0.3), rng, vibrato=(6, 0.018)), 0.17)
     return out
 
 
 def ambient2(rng):
-    """Soft rolling trill that rises at the end."""
-    return voice(0.62, glide(590, 770, 2.5), rng, vibrato=(24, 0.11),
-                 rough=(24, 0.35), attack=0.04, release=0.12)
+    """Contented purring trill that lifts at the end."""
+    return voice(0.75, glide(330, 400, 2.2), rng, trill=(17, 0.45), vibrato=(4, 0.01),
+                 formants=((520, 2.0, 1.0), (1300, 3.0, 0.35)), attack=0.08, release=0.2)
 
 
 def ambient3(rng):
-    """Curious rising chirp followed by a short blip."""
-    out = voice(0.3, expo(470, 880), rng, release=0.04)
-    mix(out, voice(0.09, glide(860, 780), rng, attack=0.008, release=0.04), 0.36)
+    """Curious 'kwi?' rising chirp and a little reply blip."""
+    out = voice(0.24, expo(440, 700), rng, release=0.05, vibrato=(7, 0.008))
+    mix(out, voice(0.1, glide(660, 600), rng, attack=0.015, release=0.05), 0.31, 0.7)
+    return out
+
+
+def ambient4(rng):
+    """Three-note lilting song, falling through a major triad."""
+    return voice(0.85, notes((587, 587, 1.0), (587, 494, 0.3), (494, 494, 0.9), (494, 392, 0.3),
+                             (392, 380, 1.4)), rng, vibrato=(5.5, 0.016), attack=0.05, release=0.22)
+
+
+def ambient5(rng):
+    """Low, mellow two-tone hoot."""
+    out = voice(0.3, arch(262, 294, 262), rng, formants=((450, 1.8, 1.0), (1100, 3.0, 0.3)), release=0.1)
+    mix(out, voice(0.36, arch(262, 277, 220), rng, formants=((450, 1.8, 1.0), (1100, 3.0, 0.3)),
+                   release=0.16), 0.36, 0.85)
     return out
 
 
 def hurt1(rng):
-    return voice(0.27, glide(980, 610, 0.6), rng, rough=(46, 0.55), breath=0.18,
-                 formants=((1100, 3, 1.0), (2600, 5, 0.7)), attack=0.005)
+    """Startled yelp: a quick bright note that drops away."""
+    return voice(0.24, glide(880, 560, 0.5), rng, trill=(38, 0.25), breath=0.1, tilt=1.3,
+                 formants=((800, 2.2, 1.0), (1900, 3.0, 0.5)), attack=0.006, release=0.12)
 
 
 def hurt2(rng):
-    out = voice(0.17, glide(1080, 760, 0.5), rng, rough=(52, 0.5), breath=0.2,
-                formants=((1150, 3, 1.0), (2700, 5, 0.7)), attack=0.004)
-    mix(out, voice(0.11, glide(900, 700), rng, rough=(40, 0.5), breath=0.2,
-                   attack=0.004), 0.2, 0.7)
+    out = voice(0.14, glide(940, 700, 0.5), rng, breath=0.1, tilt=1.3,
+                formants=((820, 2.2, 1.0), (2000, 3.0, 0.5)), attack=0.005, release=0.06)
+    mix(out, voice(0.16, glide(760, 560), rng, breath=0.1, tilt=1.4, attack=0.01, release=0.1), 0.15, 0.75)
     return out
 
 
 def death(rng):
-    out = voice(1.15, expo(820, 230), rng, vibrato=(9, 0.06), rough=(30, 0.45),
-                breath=0.14, attack=0.01, release=0.45)
-    tail = bandpass(noise(int(0.5 * SR), rng), 1400, 0.8)
-    tail = [v * e for v, e in zip(tail, envelope(len(tail), 0.08, 0.4))]
-    return mix(out, tail, 0.85, 0.25)
+    """Long, fading sigh of a call sinking down, with breath trailing off."""
+    out = voice(1.3, expo(600, 190), rng, vibrato=(5, 0.03), trill=(9, 0.2), breath=0.08,
+                attack=0.02, release=0.6)
+    sigh = apply_env(lowpass(bandpass(noise(int(0.8 * SR), rng), 900, 0.7), 1500),
+                     envelope(int(0.8 * SR), 0.2, 0.5))
+    return mix(out, sigh, 0.75, 0.35)
 
 
-def hiss(seconds, rng):
+def puff(seconds, rng, centre=1600):
     n = int(seconds * SR)
-    sig = bandpass(noise(n, rng), 3200, 1.2)
-    env = envelope(n, seconds * 0.35, seconds * 0.4, 1.5)
-    return [v * e for v, e in zip(sig, env)]
+    sig = lowpass(bandpass(noise(n, rng), centre, 0.9), 3500)
+    return apply_env(sig, envelope(n, seconds * 0.3, seconds * 0.5, 1.5))
 
 
 def angry1(rng):
-    out = hiss(0.62, rng)
-    growl = voice(0.55, glide(150, 125), rng, rough=(38, 0.7), breath=0.25,
-                  formants=((500, 3, 1.0), (1500, 4, 0.4)), attack=0.08)
-    return mix(normalize(out, 0.6), normalize(growl, 0.5), 0.04)
+    """Low warning: a breathy puff over a soft throaty rattle."""
+    growl = voice(0.55, glide(150, 130), rng, trill=(28, 0.6), breath=0.12, tilt=1.4,
+                  formants=((420, 2.0, 1.0), (1100, 3.0, 0.35)), attack=0.07, release=0.2)
+    return mix([v * 0.8 for v in puff(0.6, rng)], growl, 0.03, 0.9)
 
 
 def angry2(rng):
-    out = voice(0.2, glide(720, 620), rng, rough=(60, 0.65), breath=0.25,
-                formants=((1000, 2.5, 1.0), (2500, 4, 0.8)), attack=0.004)
-    return mix(normalize(out, 0.7), normalize(hiss(0.42, rng), 0.5), 0.12)
+    out = voice(0.22, glide(520, 430), rng, trill=(34, 0.5), breath=0.12, tilt=1.4,
+                formants=((700, 2.0, 1.0), (1700, 3.0, 0.45)), attack=0.01, release=0.1)
+    return mix(out, puff(0.4, rng, 1400), 0.1, 0.7)
 
 
-def thump(seconds, f_start, f_end, rng):
-    n = int(seconds * SR)
-    phase = 0.0
-    out = []
-    for i in range(n):
-        p = i / n
-        phase += 2 * math.pi * (f_start + (f_end - f_start) * p) / SR
-        out.append(math.sin(phase) * math.exp(-p * 6))
-    return out
+# ------------------------------------------------------------------- body sounds
 
-
-def peck(rng):
-    click = highpass(noise(int(0.006 * SR), rng), 2500)
-    click = [v * (1 - i / len(click)) for i, v in enumerate(click)]
-    out = mix(thump(0.035, 260, 140, rng), click, 0.0, 0.9)
-    crunch = bandpass(noise(int(0.05 * SR), rng), rng.uniform(1800, 2600), 1.5)
-    crunch = [v * e for v, e in zip(crunch, envelope(len(crunch), 0.002, 0.045))]
-    return mix(out, crunch, 0.008, 0.8)
+def nibble(rng):
+    """One soft beak nibble: a muted tick and a little crunch."""
+    n = int(0.05 * SR)
+    tick = apply_env(lowpass(bandpass(noise(n, rng), rng.uniform(1100, 1500), 1.2), 2400),
+                     envelope(n, 0.001, 0.045, 3))
+    crunch = apply_env(lowpass(noise(int(0.07 * SR), rng), 1800), envelope(int(0.07 * SR), 0.004, 0.06, 2))
+    return mix(tick, crunch, 0.006, 0.5)
 
 
 def eat(rng, count):
     out = silence(0.0)
     t = 0.0
     for _ in range(count):
-        mix(out, peck(rng), t, rng.uniform(0.75, 1.0))
-        t += rng.uniform(0.09, 0.14)
+        mix(out, nibble(rng), t, rng.uniform(0.7, 1.0))
+        t += rng.uniform(0.11, 0.17)
     return out
 
 
 def step(rng):
-    body = thump(0.09, rng.uniform(95, 115), 60, rng)
-    claw = highpass(noise(int(0.018 * SR), rng), 3500)
-    claw = [v * (1 - i / len(claw)) ** 2 for i, v in enumerate(claw)]
-    dirt = lowpass(bandpass(noise(int(0.11 * SR), rng), 700, 0.7), 2500)
-    dirt = [v * e for v, e in zip(dirt, envelope(len(dirt), 0.004, 0.09))]
-    out = mix(normalize(body, 1.0), normalize(claw, 0.35), 0.003)
-    return mix(out, normalize(dirt, 0.4), 0.0)
+    """Padded footfall: a low, soft thud of filtered noise with a faint brush of claws on the ground."""
+    n = int(0.16 * SR)
+    thud = lowpass(lowpass(noise(n, rng), rng.uniform(170, 230), 0.9), 260)
+    thud = apply_env(thud, envelope(n, 0.004, 0.14, 2.6))
+    m = int(0.09 * SR)
+    brush = apply_env(lowpass(bandpass(noise(m, rng), rng.uniform(900, 1300), 0.8), 1800),
+                      envelope(m, 0.006, 0.08, 2))
+    out = mix([v * 1.0 for v in thud], brush, 0.008, 0.12)
+    return lowpass(out, 1600)
 
 
-def flap(rng, beats=3, gain=1.0):
-    out = silence(0.0)
-    for b in range(beats):
-        n = int(0.11 * SR)
-        w = bandpass(noise(n, rng), rng.uniform(750, 1000), 0.6)
-        w = [v * e for v, e in zip(w, envelope(n, 0.025, 0.08, 1.5))]
-        mix(out, w, b * 0.12, gain * (1 - 0.15 * b))
-    return out
+def flap(rng, strength=1.0):
+    """A single soft wing beat: a rising-then-falling rush of air with a gentle low 'fwmp'."""
+    n = int(rng.uniform(0.2, 0.26) * SR)
+    rush = sweep_bandpass(noise(n, rng), rng.uniform(380, 450), rng.uniform(900, 1100), 0.8)
+    rush = lowpass(apply_env(rush, envelope(n, 0.07, 0.12, 1.6)), 2200)
+    m = int(0.12 * SR)
+    body = apply_env(lowpass(noise(m, rng), 140), envelope(m, 0.02, 0.09, 2))
+    return mix([v * strength for v in rush], body, 0.04, 0.6 * strength)
 
 
 def jump(rng):
-    return flap(rng, 3)
+    out = flap(rng, 1.0)
+    return mix(out, flap(rng, 0.7), 0.17)
 
 
 def land(rng):
-    out = normalize(thump(0.16, 90, 45, rng), 1.0)
-    out = mix(out, normalize(step(rng), 0.6), 0.0)
-    return mix(out, normalize(flap(rng, 2), 0.45), 0.03)
+    """Soft landing: a padded double footfall and the wings settling."""
+    out = step(rng)
+    mix(out, step(rng), 0.05, 0.8)
+    rustle = apply_env(lowpass(bandpass(noise(int(0.3 * SR), rng), 1200, 0.7), 2400),
+                       envelope(int(0.3 * SR), 0.03, 0.22, 1.8))
+    return mix(out, rustle, 0.04, 0.25)
 
 
+# name: (generator, peak, rms, reverb wet)
 CLIPS = {
-    "ambient1": (ambient1, 0.85),
-    "ambient2": (ambient2, 0.85),
-    "ambient3": (ambient3, 0.85),
-    "hurt1": (hurt1, 0.9),
-    "hurt2": (hurt2, 0.9),
-    "death": (death, 0.9),
-    "angry1": (angry1, 0.9),
-    "angry2": (angry2, 0.9),
-    "eat1": (lambda r: eat(r, 3), 0.75),
-    "eat2": (lambda r: eat(r, 4), 0.75),
-    "step1": (step, 0.8),
-    "step2": (step, 0.8),
-    "step3": (step, 0.8),
-    "jump": (jump, 0.8),
-    "land": (land, 0.85),
+    "ambient1": (ambient1, 0.7, 0.16, 0.18),
+    "ambient2": (ambient2, 0.7, 0.15, 0.18),
+    "ambient3": (ambient3, 0.7, 0.16, 0.18),
+    "ambient4": (ambient4, 0.7, 0.16, 0.2),
+    "ambient5": (ambient5, 0.7, 0.16, 0.18),
+    "hurt1": (hurt1, 0.8, 0.2, 0.12),
+    "hurt2": (hurt2, 0.8, 0.2, 0.12),
+    "death": (death, 0.8, 0.17, 0.22),
+    "angry1": (angry1, 0.7, 0.16, 0.12),
+    "angry2": (angry2, 0.7, 0.16, 0.12),
+    "eat1": (lambda r: eat(r, 3), 0.55, 0.1, 0.05),
+    "eat2": (lambda r: eat(r, 4), 0.55, 0.1, 0.05),
+    "step1": (step, 0.6, 0.14, 0.04),
+    "step2": (step, 0.6, 0.14, 0.04),
+    "step3": (step, 0.6, 0.14, 0.04),
+    "step4": (step, 0.6, 0.14, 0.04),
+    "flap1": (flap, 0.6, 0.13, 0.08),
+    "flap2": (flap, 0.6, 0.13, 0.08),
+    "flap3": (flap, 0.6, 0.13, 0.08),
+    "jump": (jump, 0.6, 0.13, 0.08),
+    "land": (land, 0.65, 0.14, 0.06),
 }
 
 
@@ -312,10 +418,18 @@ def write_wav(path, sig):
         w.writeframes(b"".join(struct.pack("<h", int(max(-1, min(1, v)) * 32767)) for v in sig))
 
 
+def trim_tail(sig, threshold=0.0015):
+    end = len(sig)
+    while end > 0 and abs(sig[end - 1]) < threshold:
+        end -= 1
+    return sig[:end]
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--wav-only", action="store_true", help="write WAVs next to the OGGs and skip encoding")
     parser.add_argument("--seed", type=int, default=20261126)
+    parser.add_argument("--only", nargs="*", help="only these clips")
     args = parser.parse_args()
 
     oggenc = shutil.which("oggenc")
@@ -324,14 +438,18 @@ def main():
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as tmp:
-        for i, (name, (make, peak)) in enumerate(CLIPS.items()):
+        for i, (name, (make, peak, loud, wet)) in enumerate(CLIPS.items()):
+            if args.only and name not in args.only:
+                continue
             rng = random.Random(args.seed + i)
-            sig = fade_edges(normalize(make(rng), peak) + silence(0.02))
+            sig = make(rng)
+            sig = reverb(sig, wet=wet) if wet else sig
+            sig = fade_edges(trim_tail(level(sig, peak, loud)) + silence(0.02))
             wav = (OUT_DIR if args.wav_only else Path(tmp)) / f"{name}.wav"
             write_wav(wav, sig)
             if not args.wav_only:
                 subprocess.run([oggenc, "-Q", "-q", "5", "-o", str(OUT_DIR / f"{name}.ogg"), str(wav)], check=True)
-            print(f"{name}: {len(sig) / SR:.2f}s")
+            print(f"{name}: {len(sig) / SR:.2f}s  peak {max(abs(v) for v in sig):.2f}  rms {rms(sig):.3f}")
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ import com.kayn.isekai.entity.IsekaiEntity;
 import com.kayn.isekai.config.IsekaiConfig;
 import com.kayn.isekai.entity.ai.LandBirdFleeGoal;
 import com.kayn.isekai.entity.ai.LandBirdFollowOwnerGoal;
+import com.kayn.isekai.entity.anim.PhaseAnimationController;
 import com.kayn.isekai.item.IsekaiItem;
 import com.kayn.isekai.sound.IsekaiSound;
 import net.minecraft.block.BlockState;
@@ -48,6 +49,7 @@ import net.minecraft.recipe.Ingredient;
 import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.registry.tag.BlockTags;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.sound.BlockSoundGroup;
 import net.minecraft.sound.SoundEvent;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
@@ -85,8 +87,24 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
     public static final float BABY_MODEL_SCALE = 0.72f;
     // Type dimensions are 1.0 x 1.85; this yields a chicken-sized 0.38 x 0.70 hitbox.
     private static final float BABY_HITBOX_SCALE = 0.7f / 1.85f;
-    private static final double SADDLE_SEAT_HEIGHT = 24.6 / 16.0;
+    // Height of the back at the seat (model pixels), averaged over each gait's cycle; the body sinks
+    // while it moves. Measured with tools/land_bird_preview.py.
+    private static final float SEAT_BACK_IDLE = 24.51f;
+    private static final float SEAT_BACK_WALK = 22.41f;
+    private static final float SEAT_BACK_SPRINT = 22.03f;
+    private static final float SEAT_BACK_WALK_BACK = 23.15f;
+    // Vanilla player in the riding pose: underside of the thighs above the feet (0.75 * 0.9375 - 2/16 * 0.9375),
+    // and the -0.35 PlayerEntity#getHeightOffset that vanilla adds to the mount offset.
+    private static final double RIDER_THIGH_HEIGHT = 0.586;
+    private static final double RIDER_HEIGHT_OFFSET = 0.35;
+    private static final double SEAT_CLEARANCE = 0.5 / 16.0 * ADULT_MODEL_SCALE;
+    private static final float SEAT_SMOOTHING = 0.2f;
     private static final double SADDLE_SEAT_BACK = 5.0 / 16.0;
+    // Falling birds spread their wings: plain falls are capped at SLOW_FALL_SPEED, and a rider holding jump
+    // glides at GLIDE_FALL_SPEED (blocks/tick). The glide must keep sinking faster than 1/32 block per tick,
+    // or the server kicks the rider for floating a vehicle.
+    private static final double SLOW_FALL_SPEED = 0.22;
+    private static final double GLIDE_FALL_SPEED = 0.06;
     private static final int DAY_TICKS = 24_000;
     private static final int NIGHT_START = 13_000;
     private static final int NIGHT_END = 23_000;
@@ -99,6 +117,8 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
     private static final int ALARM_REFRESH_TICKS = 40;
     private static final double THREAT_SAFE_DISTANCE_SQ = 12.0 * 12.0;
     private static final double HOSTILE_SCAN_RANGE = 10.0;
+    private static final double AMBIENT_FLOCK_RANGE = 12.0;
+    private static final float AMBIENT_FLOCK_VOICES = 2.5f;
     private static final int BABY_GROWTH_SECONDS_PER_CARROT = 50;
     private static final int CARROT_REGEN_TICKS = 200;
     private static final int MAX_CARROT_REGEN_TICKS = 1_200;
@@ -118,6 +138,9 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
             DataTracker.registerData(LandBirdEntity.class, TrackedDataHandlerRegistry.BOOLEAN);
     private static final TrackedData<Boolean> NIGHT_REST =
             DataTracker.registerData(LandBirdEntity.class, TrackedDataHandlerRegistry.BOOLEAN);
+    // Whether the rider is holding jump in the air; drives the flapping animation for other players.
+    private static final TrackedData<Boolean> GLIDING =
+            DataTracker.registerData(LandBirdEntity.class, TrackedDataHandlerRegistry.BOOLEAN);
     private static final byte NO_REACTION = 0;
     private static final byte FEED_REACTION = 1;
     private static final byte HAPPY_REACTION = 2;
@@ -128,18 +151,27 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
     private static final RawAnimation ADULT_SIT = RawAnimation.begin().thenLoop("adult.sit");
     private static final RawAnimation ADULT_DEATH = RawAnimation.begin().thenPlayAndHold("adult.death");
     private static final RawAnimation ADULT_FLAP = RawAnimation.begin().thenLoop("adult.flap");
+    private static final RawAnimation ADULT_GLIDE = RawAnimation.begin().thenLoop("adult.glide");
+    private static final RawAnimation ADULT_AIR = RawAnimation.begin().thenLoop("adult.air");
+    private static final RawAnimation ADULT_WALK_BACK = RawAnimation.begin().thenLoop("adult.walk_back");
     // Ticks off the ground before the wings start flapping, so stepping up a block does not trigger it.
     private static final int FLAP_AIR_TICKS = 3;
-    // Ground speed (blocks per tick) each gait was authored for; playback scales to the real speed
-    // so the planted foot does not slide. Walk: 15px stride per 0.375s stance, sprint: 14px per 0.1575s.
+    // Ground speed (blocks per tick) each gait was authored for. Walk: 15px stride per 0.375s stance,
+    // sprint: 14px per 0.1575s, walking backwards: the walk at 85% stride.
     private static final float WALK_DESIGN_SPEED = 0.100f;
     private static final float SPRINT_DESIGN_SPEED = 0.222f;
+    private static final float WALK_BACK_DESIGN_SPEED = 0.085f;
     // Without a rider the gait follows speed: wandering walks, following or fleeing sprints.
     private static final float SPRINT_SPEED_THRESHOLD = 0.15f;
     private static final float STANDING_SPEED = 0.008f;
-    private static final double MIN_GAIT_PLAYBACK = 0.5;
-    private static final double MAX_WALK_PLAYBACK = 2.0;
-    private static final double MAX_SPRINT_PLAYBACK = 2.5;
+    // Ridden birds cover far more ground than a stride allows (walk ~0.26, sprint ~0.65 blocks/tick), so
+    // playback only follows speed up to a natural cadence (walk ~4, sprint ~5 steps a second) and the feet
+    // are allowed to slide past that, instead of the legs whirring.
+    private static final double MIN_GAIT_PLAYBACK = 0.6;
+    private static final double MAX_WALK_PLAYBACK = 1.25;
+    private static final double MAX_SPRINT_PLAYBACK = 1.15;
+    private static final double MAX_WALK_BACK_PLAYBACK = 1.2;
+    private static final float SPEED_SMOOTHING = 0.25f;
     // Chick gaits, authored the same way on the 0.72-scale juvenile model.
     private static final float BABY_WALK_DESIGN_SPEED = 0.055f;
     private static final float BABY_RUN_DESIGN_SPEED = 0.113f;
@@ -156,6 +188,11 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
     private int babyReactionTicks;
     private int airTicks;
     private float groundSpeed;
+    // Ground speed along the facing direction; negative while backing up.
+    private float forwardSpeed;
+    private float seatBack = SEAT_BACK_IDLE;
+    // Set while a rider glides; keeps the jump bar from charging until they let go of jump after landing.
+    private boolean jumpLocked;
     @Nullable
     private Vec3d ownerAnchor;
     private int ownerStillTicks;
@@ -246,6 +283,7 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
         dataTracker.startTracking(MODE, Mode.ROAM.ordinal());
         dataTracker.startTracking(AWAITING_OWNER, false);
         dataTracker.startTracking(NIGHT_REST, false);
+        dataTracker.startTracking(GLIDING, false);
     }
 
     @Override
@@ -358,9 +396,24 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
         return groundSpeed >= SPRINT_SPEED_THRESHOLD;
     }
 
+    /**
+     * Puts the rider's thighs on the back. Vanilla places the passenger's feet at this offset minus 0.35, and
+     * a riding player's thighs sit 0.586 above their feet; the back itself sinks while the bird walks or
+     * runs, so the seat eases toward the height of the current gait.
+     */
     @Override
     public double getMountedHeightOffset() {
-        return SADDLE_SEAT_HEIGHT * ADULT_MODEL_SCALE;
+        return seatBack / 16.0 * ADULT_MODEL_SCALE + SEAT_CLEARANCE - RIDER_THIGH_HEIGHT + RIDER_HEIGHT_OFFSET;
+    }
+
+    private float targetSeatBack() {
+        if (isAirborne() || groundSpeed < STANDING_SPEED) {
+            return SEAT_BACK_IDLE;
+        }
+        if (isBackingUp()) {
+            return SEAT_BACK_WALK_BACK;
+        }
+        return isSprintGait() ? SEAT_BACK_SPRINT : SEAT_BACK_WALK;
     }
 
     @Override
@@ -519,10 +572,80 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
         airTicks = isOnGround() || isTouchingWater() || hasVehicle() ? 0 : airTicks + 1;
         double dx = getX() - prevX;
         double dz = getZ() - prevZ;
-        groundSpeed += ((float) Math.sqrt(dx * dx + dz * dz) - groundSpeed) * 0.35f;
+        groundSpeed += ((float) Math.sqrt(dx * dx + dz * dz) - groundSpeed) * SPEED_SMOOTHING;
+        float yaw = getYaw() * MathHelper.RADIANS_PER_DEGREE;
+        float along = (float) (-MathHelper.sin(yaw) * dx + MathHelper.cos(yaw) * dz);
+        forwardSpeed += (along - forwardSpeed) * SPEED_SMOOTHING;
+        seatBack += (targetSeatBack() - seatBack) * SEAT_SMOOTHING;
+        updateGliding();
         if (babyReactionTicks > 0 && --babyReactionTicks == 0) {
             dataTracker.set(BABY_REACTION, NO_REACTION);
         }
+    }
+
+    private boolean isAirborne() {
+        return airTicks >= FLAP_AIR_TICKS;
+    }
+
+    private boolean isBackingUp() {
+        return forwardSpeed < -STANDING_SPEED && -forwardSpeed > groundSpeed * 0.6f;
+    }
+
+    /** The rider holding jump, seen from whichever side has their input (server, or the rider's client). */
+    private boolean isRiderHoldingJump() {
+        return getControllingPassenger() instanceof PlayerEntity rider && rider.jumping;
+    }
+
+    private void updateGliding() {
+        boolean holding = isRiderHoldingJump();
+        if (!isOnGround() && holding) {
+            jumpLocked = true;
+        } else if (!holding) {
+            jumpLocked = false;
+        }
+        if (!getWorld().isClient) {
+            dataTracker.set(GLIDING, !isOnGround() && !isTouchingWater() && holding);
+        }
+    }
+
+    /** Actively flapping: a rider holding jump in the air (local prediction for the rider's own client). */
+    private boolean isFlapping() {
+        if (getWorld().isClient && isLogicalSideForUpdatingMovement()) {
+            return !isOnGround() && isRiderHoldingJump();
+        }
+        return dataTracker.get(GLIDING);
+    }
+
+    @Override
+    public void travel(Vec3d movementInput) {
+        super.travel(movementInput);
+        // Spread wings: a falling bird drifts down instead of dropping, and glides while its rider holds jump.
+        if (isAlive() && !isOnGround() && !isTouchingWater() && !isInLava() && !hasNoGravity() && !isClimbing()) {
+            Vec3d velocity = getVelocity();
+            double limit = isRiderHoldingJump() ? -GLIDE_FALL_SPEED : -SLOW_FALL_SPEED;
+            if (velocity.y < limit) {
+                setVelocity(velocity.x, limit, velocity.z);
+            }
+        }
+    }
+
+    @Override
+    public boolean canJump() {
+        // In the air the jump key glides, so the client must not charge (and queue) a jump with it. After
+        // landing it stays locked until the key is released, or letting go would launch a jump.
+        if (getWorld().isClient) {
+            return super.canJump() && isOnGround() && !jumpLocked;
+        }
+        return super.canJump();
+    }
+
+    @Override
+    public boolean handleFallDamage(float fallDistance, float damageMultiplier, DamageSource damageSource) {
+        // The wings break every fall, so neither the bird nor its rider takes fall damage.
+        if (fallDistance > 1.0f) {
+            playSound(IsekaiSound.LAND_BIRD_LAND, 0.4f, 1.0f);
+        }
+        return false;
     }
 
     private boolean isNight() {
@@ -761,15 +884,68 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
 
     @Override
     protected void playStepSound(BlockPos pos, BlockState state) {
-        // Replaces the horse's hoof, gallop and breathing sounds with clawed footsteps.
-        if (!state.isLiquid()) {
-            playSound(IsekaiSound.LAND_BIRD_STEP, hasPassengers() ? 0.3f : 0.15f, 1.0f);
-        }
+        // Footsteps come from the walk animations' footfall keyframes (see onSoundKeyframe), so they match
+        // the feet instead of firing every 1.7 blocks, which turned into a rattle at riding speed. This also
+        // silences the horse's hoof, gallop and breathing sounds.
     }
 
     @Override
     protected void playJumpSound() {
-        playSound(IsekaiSound.LAND_BIRD_JUMP, 0.4f, 1.0f);
+        playSound(IsekaiSound.LAND_BIRD_JUMP, 0.35f, 1.0f);
+    }
+
+    @Override
+    public int getMinAmbientSoundDelay() {
+        return 480;
+    }
+
+    @Override
+    protected float getSoundVolume() {
+        return isBaby() ? 0.45f : 0.6f;
+    }
+
+    @Override
+    protected boolean shouldAmbientStand() {
+        // The horse's random rearing also calls out; land birds do not rear.
+        return false;
+    }
+
+    @Override
+    public void playAmbientSound() {
+        if (dataTracker.get(NIGHT_REST)) {
+            return;
+        }
+        // In a flock only some birds speak up, so a crowd sounds about as busy as a few birds.
+        int neighbours = getWorld().getEntitiesByClass(LandBirdEntity.class,
+                getBoundingBox().expand(AMBIENT_FLOCK_RANGE), bird -> bird != this && bird.isAlive()).size();
+        if (neighbours > 0 && random.nextFloat() * (neighbours + 1) > AMBIENT_FLOCK_VOICES) {
+            return;
+        }
+        super.playAmbientSound();
+    }
+
+    /** Client-side sound cues placed in the animations: footfalls and wing beats. */
+    private void onSoundKeyframe(String cue) {
+        World world = getWorld();
+        if (!world.isClient || isSilent()) {
+            return;
+        }
+        float pitch = isBaby() ? 1.35f + random.nextFloat() * 0.15f : 0.92f + random.nextFloat() * 0.16f;
+        if (cue.equals("step")) {
+            if (!isOnGround() || isTouchingWater()) {
+                return;
+            }
+            float weight = isBaby() ? 0.45f : hasPassengers() ? 1.0f : 0.8f;
+            // The ground's own step sound, low and soft, under a padded claw step.
+            BlockSoundGroup ground = world.getBlockState(getSteppingPos()).getSoundGroup();
+            world.playSound(getX(), getY(), getZ(), ground.getStepSound(), getSoundCategory(),
+                    ground.getVolume() * 0.14f * weight, ground.getPitch() * 0.82f, false);
+            world.playSound(getX(), getY(), getZ(), IsekaiSound.LAND_BIRD_STEP, getSoundCategory(),
+                    0.32f * weight, pitch, false);
+        } else if (cue.equals("flap")) {
+            world.playSound(getX(), getY(), getZ(), IsekaiSound.LAND_BIRD_FLAP, getSoundCategory(),
+                    0.3f, pitch, false);
+        }
     }
 
     @Override
@@ -791,26 +967,40 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
 
     @Override
     public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
-        controllers.add(new AnimationController<>(this, "bird", 4, state -> {
+        PhaseAnimationController<LandBirdEntity> body = new PhaseAnimationController<>(this, "bird", 4, state -> {
             RawAnimation animation = selectAnimation();
-            double playback = 1.0;
-            if (animation == ADULT_WALK || animation == BABY_WALK) {
-                float design = animation == ADULT_WALK ? WALK_DESIGN_SPEED : BABY_WALK_DESIGN_SPEED;
-                playback = MathHelper.clamp(groundSpeed / design, MIN_GAIT_PLAYBACK, MAX_WALK_PLAYBACK);
-            } else if (animation == ADULT_SPRINT || animation == BABY_RUN) {
-                float design = animation == ADULT_SPRINT ? SPRINT_DESIGN_SPEED : BABY_RUN_DESIGN_SPEED;
-                playback = MathHelper.clamp(groundSpeed / design, MIN_GAIT_PLAYBACK, MAX_SPRINT_PLAYBACK);
-            }
-            state.getController().setAnimationSpeed(playback);
+            ((PhaseAnimationController<?>) state.getController()).setPlayback(gaitPlayback(animation));
             return state.setAndContinue(animation);
-        }));
-        // Layered on top of the body animation: only the wing bones move, so the legs keep running.
-        controllers.add(new AnimationController<>(this, "wings", 3, state -> {
-            if (isBaby() || isDead() || isSitting() || airTicks < FLAP_AIR_TICKS) {
+        });
+        body.setSoundKeyframeHandler(event -> onSoundKeyframe(event.getKeyframeData().getSound()));
+        controllers.add(body);
+        // Layered on top of the body animation: only the wing bones move. Rising or a rider holding jump
+        // flaps; otherwise the wings stay spread in a glide.
+        AnimationController<LandBirdEntity> wings = new AnimationController<>(this, "wings", 4, state -> {
+            if (isBaby() || isDead() || isSitting() || !isAirborne()) {
                 return PlayState.STOP;
             }
-            return state.setAndContinue(ADULT_FLAP);
-        }));
+            boolean rising = getY() - prevY > 0.02;
+            return state.setAndContinue(isFlapping() || rising ? ADULT_FLAP : ADULT_GLIDE);
+        });
+        wings.setSoundKeyframeHandler(event -> onSoundKeyframe(event.getKeyframeData().getSound()));
+        controllers.add(wings);
+    }
+
+    /** Gaits follow ground speed between a slow amble and a natural top cadence (see MAX_*_PLAYBACK). */
+    private double gaitPlayback(RawAnimation animation) {
+        if (animation == ADULT_WALK || animation == BABY_WALK) {
+            float design = animation == ADULT_WALK ? WALK_DESIGN_SPEED : BABY_WALK_DESIGN_SPEED;
+            return MathHelper.clamp(groundSpeed / design, MIN_GAIT_PLAYBACK, MAX_WALK_PLAYBACK);
+        }
+        if (animation == ADULT_SPRINT || animation == BABY_RUN) {
+            float design = animation == ADULT_SPRINT ? SPRINT_DESIGN_SPEED : BABY_RUN_DESIGN_SPEED;
+            return MathHelper.clamp(groundSpeed / design, MIN_GAIT_PLAYBACK, MAX_SPRINT_PLAYBACK);
+        }
+        if (animation == ADULT_WALK_BACK) {
+            return MathHelper.clamp(groundSpeed / WALK_BACK_DESIGN_SPEED, MIN_GAIT_PLAYBACK, MAX_WALK_BACK_PLAYBACK);
+        }
+        return 1.0;
     }
 
     private RawAnimation selectAnimation() {
@@ -830,8 +1020,14 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
                 default -> BABY_IDLE;
             };
         }
+        if (isAirborne()) {
+            return ADULT_AIR;
+        }
         if (groundSpeed < STANDING_SPEED) {
             return ADULT_IDLE;
+        }
+        if (isBackingUp()) {
+            return ADULT_WALK_BACK;
         }
         return isSprintGait() ? ADULT_SPRINT : ADULT_WALK;
     }

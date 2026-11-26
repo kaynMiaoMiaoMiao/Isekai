@@ -16,6 +16,7 @@ public final class IsekaiSound {
     public static final SoundEvent LAND_BIRD_STEP = register("entity.land_bird.step");
     public static final SoundEvent LAND_BIRD_JUMP = register("entity.land_bird.jump");
     public static final SoundEvent LAND_BIRD_LAND = register("entity.land_bird.land");
+    public static final SoundEvent LAND_BIRD_FLAP = register("entity.land_bird.flap");
 
     private IsekaiSound() {
     }

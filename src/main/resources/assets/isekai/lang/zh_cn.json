@@ -22,6 +22,7 @@
   "subtitles.isekai.entity.land_bird.step": "陆行鸟：脚步声",
   "subtitles.isekai.entity.land_bird.jump": "陆行鸟：振翅",
   "subtitles.isekai.entity.land_bird.land": "陆行鸟：落地",
+  "subtitles.isekai.entity.land_bird.flap": "陆行鸟：扇动翅膀",
   "message.isekai.land_bird_egg.progress_blocked": "孵化中 %s%%，大约还需 %s。注意：蛋上方被挡住了，到时会无法破壳",
   "message.isekai.land_bird_egg.paused": "孵化已暂停（%s%%）：3 格内没有热源",
   "message.isekai.land_bird_egg.cold": "蛋是凉的：在 3 格内放置点燃的营火、火、灵魂火、熔岩或岩浆块即可开始孵化",

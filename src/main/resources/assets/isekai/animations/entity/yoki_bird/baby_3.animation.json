@@ -774,6 +774,10 @@
             "0.4": {"post": [0, 0, 6.524], "lerp_mode": "catmullrom"}
           }
         }
+      },
+      "sound_effects": {
+        "0.19": {"effect": "step"},
+        "0.39": {"effect": "step"}
       }
     },
     "baby.happy": {
@@ -3650,6 +3654,10 @@
             "0.3": {"post": [10, 0, 38.415], "lerp_mode": "catmullrom"}
           }
         }
+      },
+      "sound_effects": {
+        "0.097": {"effect": "step"},
+        "0.247": {"effect": "step"}
       }
     }
   }

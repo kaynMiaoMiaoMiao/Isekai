@@ -21,6 +21,10 @@ repositories {
 	}
 }
 
+loom {
+	accessWidenerPath = file("src/main/resources/isekai.accesswidener")
+}
+
 fabricApi {
 	configureDataGeneration {
 		client = true
