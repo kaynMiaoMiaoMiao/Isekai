@@ -62,6 +62,10 @@ import java.util.UUID;
 public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
     public static final int PLUMAGE_COUNT = 6;
     public static final float ADULT_MODEL_SCALE = 0.8f;
+    // Juvenile geo models are ~21px tall; a vanilla chicken is ~15px, so shrink them to match.
+    public static final float BABY_MODEL_SCALE = 0.72f;
+    // Type dimensions are 1.0 x 1.85; this yields a chicken-sized 0.38 x 0.70 hitbox.
+    private static final float BABY_HITBOX_SCALE = 0.7f / 1.85f;
     private static final float BABY_WALK_MIN_STRIDE = 0.025f;
     private static final double SADDLE_SEAT_HEIGHT = 24.6 / 16.0;
     private static final double SADDLE_SEAT_BACK = 5.0 / 16.0;
@@ -242,8 +246,8 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
 
     @Override
     public float getScaleFactor() {
-        // The type already uses adult dimensions. Juveniles keep their original hitbox.
-        return isBaby() ? super.getScaleFactor() / ADULT_MODEL_SCALE : 1.0f;
+        // The type already uses adult dimensions. Juveniles get a chicken-sized hitbox.
+        return isBaby() ? BABY_HITBOX_SCALE : 1.0f;
     }
 
     @Override

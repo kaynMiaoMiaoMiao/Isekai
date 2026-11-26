@@ -16,9 +16,9 @@ public class LandBirdRenderer extends GeoEntityRenderer<LandBirdEntity> {
     @Override
     public void render(LandBirdEntity bird, float yaw, float tickDelta, MatrixStack matrices,
                        VertexConsumerProvider vertices, int light) {
-        // Juvenile models already have their own native dimensions.
-        withScale(bird.isBaby() ? 1.0f : LandBirdEntity.ADULT_MODEL_SCALE);
-        shadowRadius = bird.isBaby() ? 0.35f : 0.6f * LandBirdEntity.ADULT_MODEL_SCALE;
+        // Juveniles use their own models, scaled down to roughly a chicken's size.
+        withScale(bird.isBaby() ? LandBirdEntity.BABY_MODEL_SCALE : LandBirdEntity.ADULT_MODEL_SCALE);
+        shadowRadius = bird.isBaby() ? 0.3f : 0.6f * LandBirdEntity.ADULT_MODEL_SCALE;
         super.render(bird, yaw, tickDelta, matrices, vertices, light);
     }
 
