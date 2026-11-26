@@ -1,6 +1,5 @@
 package com.kayn.isekai.block;
 
-import com.kayn.isekai.config.IsekaiConfig;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockRenderType;
 import net.minecraft.block.BlockState;
@@ -10,6 +9,7 @@ import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.block.entity.BlockEntityTicker;
 import net.minecraft.block.entity.BlockEntityType;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
@@ -61,9 +61,8 @@ public class LandBirdEggBlock extends BlockWithEntity {
         if (!player.getStackInHand(hand).isEmpty() || !(world.getBlockEntity(pos) instanceof LandBirdEggBlockEntity egg)) {
             return ActionResult.PASS;
         }
-        if (!world.isClient) {
-            player.sendMessage(Text.translatable("message.isekai.land_bird_egg.progress",
-                    egg.getIncubationSeconds(), IsekaiConfig.eggIncubationSeconds()), true);
+        if (world instanceof ServerWorld server) {
+            player.sendMessage(egg.describeProgress(server), true);
         }
         return ActionResult.success(world.isClient);
     }

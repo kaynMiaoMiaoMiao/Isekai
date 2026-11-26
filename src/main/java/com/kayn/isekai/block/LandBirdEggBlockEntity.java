@@ -15,8 +15,10 @@ import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.tag.TagKey;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.state.property.Properties;
+import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
+import org.jetbrains.annotations.Nullable;
 import software.bernie.geckolib.animatable.GeoBlockEntity;
 import software.bernie.geckolib.core.animatable.instance.AnimatableInstanceCache;
 import software.bernie.geckolib.core.animation.AnimatableManager;
@@ -51,8 +53,33 @@ public class LandBirdEggBlockEntity extends BlockEntity implements GeoBlockEntit
         return ((LandBirdEggBlock) getCachedState().getBlock()).getPlumage();
     }
 
-    public int getIncubationSeconds() {
-        return Math.min(incubationTicks / 20, IsekaiConfig.eggIncubationSeconds());
+    /** Describes the egg's state for the player who right-clicks it. */
+    public Text describeProgress(ServerWorld world) {
+        int target = IsekaiConfig.eggIncubationTicks();
+        int ticks = Math.min(incubationTicks, target);
+        int percent = (int) (ticks * 100L / target);
+        boolean roomToHatch = createChick(world, pos) != null;
+        if (ticks >= target) {
+            return roomToHatch
+                    ? Text.translatable("message.isekai.land_bird_egg.hatching")
+                    : Text.translatable("message.isekai.land_bird_egg.blocked");
+        }
+        if (!incubating) {
+            return ticks == 0
+                    ? Text.translatable("message.isekai.land_bird_egg.cold")
+                    : Text.translatable("message.isekai.land_bird_egg.paused", percent);
+        }
+        Text remaining = formatDuration((target - ticks + 19) / 20);
+        return roomToHatch
+                ? Text.translatable("message.isekai.land_bird_egg.progress", percent, remaining)
+                : Text.translatable("message.isekai.land_bird_egg.progress_blocked", percent, remaining);
+    }
+
+    private static Text formatDuration(int seconds) {
+        int minutes = seconds / 60;
+        return minutes > 0
+                ? Text.translatable("message.isekai.duration.minutes", minutes, seconds % 60)
+                : Text.translatable("message.isekai.duration.seconds", seconds);
     }
 
     private static int hatchAnimationStart(int incubationTargetTicks) {
@@ -114,15 +141,22 @@ public class LandBirdEggBlockEntity extends BlockEntity implements GeoBlockEntit
         return false;
     }
 
-    private void hatch(ServerWorld world, BlockPos pos) {
+    /** A chick placed on top of the egg, or null when there is no room for it. */
+    @Nullable
+    private LandBirdEntity createChick(ServerWorld world, BlockPos pos) {
         LandBirdEntity chick = IsekaiEntity.LAND_BIRD.create(world);
         if (chick == null) {
-            return;
+            return null;
         }
         chick.initializeHatchling(getPlumage());
         chick.refreshPositionAndAngles(pos.getX() + 0.5, pos.getY() + 1.0, pos.getZ() + 0.5,
                 world.getRandom().nextFloat() * 360, 0);
-        if (world.isSpaceEmpty(chick) && world.spawnEntity(chick) && world.getBlockEntity(pos) == this) {
+        return world.isSpaceEmpty(chick) ? chick : null;
+    }
+
+    private void hatch(ServerWorld world, BlockPos pos) {
+        LandBirdEntity chick = createChick(world, pos);
+        if (chick != null && world.spawnEntity(chick) && world.getBlockEntity(pos) == this) {
             world.removeBlock(pos, false);
         }
     }

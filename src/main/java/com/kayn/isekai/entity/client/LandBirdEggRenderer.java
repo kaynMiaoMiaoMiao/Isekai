@@ -12,7 +12,7 @@ public class LandBirdEggRenderer extends GeoBlockRenderer<LandBirdEggBlockEntity
     private static final Identifier MODEL = Isekai.id("geo/entity/yoki_bird/egg.geo.json");
     private static final Identifier TEXTURE = Isekai.id("textures/entity/yoki_bird/egg.png");
     private static final Identifier ANIMATIONS = Isekai.id("animations/entity/yoki_bird/egg.animation.json");
-    private static final int[] TINTS = {0xF58B70, 0x83B4FF, 0xEBA6B5, 0x80D6AC, 0x8D78B7, 0xCBDCFF};
+    private static final int[] TINTS = {0xF58B70, 0x83B4FF, 0xEBA6B5, 0x80D6AC, 0x5A6178, 0xCBDCFF};
 
     public LandBirdEggRenderer(BlockEntityRendererFactory.Context context) {
         super(new GeoModel<>() {

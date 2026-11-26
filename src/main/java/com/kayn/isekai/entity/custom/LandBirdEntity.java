@@ -1,11 +1,15 @@
 package com.kayn.isekai.entity.custom;
 
 import com.kayn.isekai.entity.IsekaiEntity;
+import com.kayn.isekai.config.IsekaiConfig;
+import com.kayn.isekai.entity.ai.LandBirdFleeGoal;
 import com.kayn.isekai.entity.ai.LandBirdFollowOwnerGoal;
 import com.kayn.isekai.item.IsekaiItem;
 import com.kayn.isekai.sound.IsekaiSound;
 import net.minecraft.block.BlockState;
+import net.minecraft.block.Blocks;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.EntityData;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.EquipmentSlot;
@@ -19,6 +23,9 @@ import net.minecraft.entity.ai.goal.LookAroundGoal;
 import net.minecraft.entity.ai.goal.SwimGoal;
 import net.minecraft.entity.ai.goal.TemptGoal;
 import net.minecraft.entity.ai.goal.WanderAroundFarGoal;
+import net.minecraft.entity.effect.StatusEffectInstance;
+import net.minecraft.entity.effect.StatusEffects;
+import net.minecraft.entity.mob.HostileEntity;
 import net.minecraft.entity.attribute.DefaultAttributeContainer;
 import net.minecraft.entity.attribute.EntityAttributeInstance;
 import net.minecraft.entity.attribute.EntityAttributeModifier;
@@ -38,6 +45,8 @@ import net.minecraft.item.Items;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtElement;
 import net.minecraft.recipe.Ingredient;
+import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.registry.tag.BlockTags;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundEvent;
 import net.minecraft.sound.SoundEvents;
@@ -47,10 +56,13 @@ import net.minecraft.util.Hand;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.math.random.Random;
 import net.minecraft.world.EntityView;
 import net.minecraft.world.LocalDifficulty;
 import net.minecraft.world.ServerWorldAccess;
 import net.minecraft.world.World;
+import net.minecraft.world.biome.Biome;
 import org.jetbrains.annotations.Nullable;
 import software.bernie.geckolib.animatable.GeoEntity;
 import software.bernie.geckolib.core.animatable.instance.AnimatableInstanceCache;
@@ -59,7 +71,10 @@ import software.bernie.geckolib.core.animation.AnimationController;
 import software.bernie.geckolib.core.animation.RawAnimation;
 import software.bernie.geckolib.util.GeckoLibUtil;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.UUID;
 
 public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
@@ -75,6 +90,18 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
     private static final int DAY_TICKS = 24_000;
     private static final int NIGHT_START = 13_000;
     private static final int NIGHT_END = 23_000;
+    // A following bird only sleeps once its owner has stood still this long.
+    private static final int OWNER_STILL_TICKS_TO_SLEEP = 60;
+    private static final int OWNER_STILL_TICKS_TO_SLEEP_AWAY = 200;
+    private static final double OWNER_MOVED_DISTANCE_SQ = 0.5 * 0.5;
+    private static final double SLEEP_NEAR_OWNER_DISTANCE_SQ = 4.0 * 4.0;
+    private static final int ALARM_TICKS = 100;
+    private static final int ALARM_REFRESH_TICKS = 40;
+    private static final double THREAT_SAFE_DISTANCE_SQ = 12.0 * 12.0;
+    private static final double HOSTILE_SCAN_RANGE = 10.0;
+    private static final int BABY_GROWTH_SECONDS_PER_CARROT = 50;
+    private static final int CARROT_REGEN_TICKS = 200;
+    private static final int MAX_CARROT_REGEN_TICKS = 1_200;
     private static final Ingredient TEMPTING_FOOD = Ingredient.ofItems(Items.CARROT, Items.GOLDEN_CARROT);
     private static final int DEFAULT_PLUMAGE = 1;
     private static final String PLUMAGE_NBT_KEY = "Plumage";
@@ -109,6 +136,12 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
 
     private final AnimatableInstanceCache animationCache = GeckoLibUtil.createInstanceCache(this);
     private int babyReactionTicks;
+    @Nullable
+    private Vec3d ownerAnchor;
+    private int ownerStillTicks;
+    private int alarmTicks;
+    @Nullable
+    private LivingEntity threat;
 
     public LandBirdEntity(EntityType<? extends LandBirdEntity> type, World world) {
         super(type, world);
@@ -139,6 +172,7 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
                 getNavigation().stop();
             }
         });
+        goalSelector.add(2, new LandBirdFleeGoal(this));
         goalSelector.add(2, new EscapeDangerGoal(this, 1.2));
         goalSelector.add(3, new AnimalMateGoal(this, 1.0));
         goalSelector.add(4, new TemptGoal(this, 1.15, TEMPTING_FOOD, false) {
@@ -197,8 +231,36 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
     @Override
     public EntityData initialize(ServerWorldAccess world, LocalDifficulty difficulty, SpawnReason reason,
                                  @Nullable EntityData entityData, @Nullable NbtCompound entityNbt) {
-        randomizePlumage();
+        if (reason == SpawnReason.NATURAL || reason == SpawnReason.CHUNK_GENERATION) {
+            choosePlumageFor(world.getBiome(getBlockPos()));
+        } else {
+            randomizePlumage();
+        }
         return super.initialize(world, difficulty, reason, entityData, entityNbt);
+    }
+
+    /** Natural spawns take the plumage configured for their biome. */
+    private void choosePlumageFor(RegistryEntry<Biome> biome) {
+        List<Integer> matches = new ArrayList<>();
+        for (int plumage = 1; plumage <= PLUMAGE_COUNT; plumage++) {
+            if (IsekaiConfig.plumageBiomes(plumage).test(biome)) {
+                matches.add(plumage);
+            }
+        }
+        if (matches.isEmpty()) {
+            randomizePlumage();
+        } else {
+            setPlumage(matches.get(random.nextInt(matches.size())));
+        }
+    }
+
+    public static boolean canSpawn(EntityType<LandBirdEntity> type, ServerWorldAccess world, SpawnReason reason,
+                                   BlockPos pos, Random random) {
+        // Unlike most animals, land birds also live on sand, terracotta, mud and snow.
+        BlockState ground = world.getBlockState(pos.down());
+        boolean walkable = ground.isIn(BlockTags.ANIMALS_SPAWNABLE_ON) || ground.isIn(BlockTags.DIRT)
+                || ground.isIn(BlockTags.SAND) || ground.isIn(BlockTags.TERRACOTTA) || ground.isOf(Blocks.SNOW_BLOCK);
+        return walkable && isLightLevelValidForNaturalSpawn(world, pos);
     }
 
     public int getPlumage() {
@@ -281,24 +343,18 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
 
         boolean client = getWorld().isClient;
         ItemStack stack = player.getStackInHand(hand);
-        if (isBreedingItem(stack)) {
-            if (client) {
-                return ActionResult.SUCCESS;
-            }
-            if (!canStartBreeding() || !canEat()) {
-                return ActionResult.PASS;
-            }
-            consume(player, stack);
-            lovePlayer(player);
-            playSound(getEatSound(), 1.0f, 1.0f);
-            return ActionResult.CONSUME;
+        if (stack.isOf(Items.GOLDEN_CARROT)) {
+            return feedGoldenCarrot(player, stack, client);
         }
-        if (isBaby() && isTame() && stack.isOf(Items.CARROT)) {
+        if (stack.isOf(Items.CARROT) && isTame() && (isBaby() || getHealth() < getMaxHealth())) {
             if (!client) {
                 consume(player, stack);
-                growUp(10);
                 playSound(getEatSound(), 1.0f, 1.0f);
-                react(FEED_REACTION, 40);
+                regenerateFromCarrot();
+                if (isBaby()) {
+                    growUp(BABY_GROWTH_SECONDS_PER_CARROT);
+                    react(FEED_REACTION, 40);
+                }
             }
             return ActionResult.success(client);
         }
@@ -308,6 +364,41 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
         return super.interactMob(player, hand);
     }
 
+    /** Golden carrots heal fully, start breeding for adults and speed up a tame chick's growth. */
+    private ActionResult feedGoldenCarrot(PlayerEntity player, ItemStack stack, boolean client) {
+        boolean heal = getHealth() < getMaxHealth();
+        boolean grow = isBaby() && isTame();
+        if (client) {
+            // The client cannot see the breeding cooldown, so it only rules out the obvious no-op.
+            return heal || grow || !isBaby() ? ActionResult.SUCCESS : ActionResult.PASS;
+        }
+        boolean breed = !isBaby() && canStartBreeding() && canEat();
+        if (!heal && !grow && !breed) {
+            return ActionResult.PASS;
+        }
+        consume(player, stack);
+        playSound(getEatSound(), 1.0f, 1.0f);
+        if (heal) {
+            setHealth(getMaxHealth());
+        }
+        if (breed) {
+            lovePlayer(player);
+        }
+        if (grow) {
+            growUp(BABY_GROWTH_SECONDS_PER_CARROT);
+            react(FEED_REACTION, 40);
+        }
+        return ActionResult.CONSUME;
+    }
+
+    /** Each carrot adds ten seconds of Regeneration I, up to a minute. */
+    private void regenerateFromCarrot() {
+        StatusEffectInstance current = getStatusEffect(StatusEffects.REGENERATION);
+        int remaining = current != null && current.getAmplifier() == 0 ? current.getDuration() : 0;
+        addStatusEffect(new StatusEffectInstance(StatusEffects.REGENERATION,
+                Math.min(MAX_CARROT_REGEN_TICKS, remaining + CARROT_REGEN_TICKS), 0));
+    }
+
     public ActionResult interactCommand(PlayerEntity player, Hand hand) {
         if (player.isSpectator() || !isAlive()) {
             return ActionResult.PASS;
@@ -315,12 +406,23 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
         boolean client = getWorld().isClient;
         ItemStack stack = player.getStackInHand(hand);
         boolean awaitingOwner = dataTracker.get(AWAITING_OWNER);
-        if (!isTame() && (awaitingOwner || stack.isOf(Items.CARROT))) {
+        if (!isTame() && awaitingOwner) {
             if (!client) {
-                if (!awaitingOwner) {
-                    consume(player, stack);
-                }
                 claim(player);
+            }
+            return ActionResult.success(client);
+        }
+        if (!isTame() && stack.isOf(Items.CARROT)) {
+            if (!client) {
+                consume(player, stack);
+                playSound(getEatSound(), 1.0f, 1.0f);
+                regenerateFromCarrot();
+                if (random.nextInt(100) < IsekaiConfig.tameChancePercent()) {
+                    claim(player);
+                } else {
+                    // Smoke puffs, like a horse refusing its rider.
+                    getWorld().sendEntityStatus(this, (byte) 6);
+                }
             }
             return ActionResult.success(client);
         }
@@ -376,10 +478,18 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
         }
     }
 
-    private void updateNightRest() {
+    private boolean isNight() {
         World world = getWorld();
         long dayTime = Math.floorMod(world.getTimeOfDay(), DAY_TICKS);
-        boolean resting = world.getDimension().hasSkyLight() && dayTime >= NIGHT_START && dayTime < NIGHT_END
+        return world.getDimension().hasSkyLight() && dayTime >= NIGHT_START && dayTime < NIGHT_END;
+    }
+
+    private void updateNightRest() {
+        World world = getWorld();
+        updateAlarm();
+        boolean night = isNight();
+        boolean ownerSettled = updateOwnerSettled(night);
+        boolean resting = night && ownerSettled && !isAlarmed()
                 && !isTouchingWater() && !isInLava() && !hasPassengers() && !hasVehicle()
                 && (isOnGround() || hasGroundUnderfoot(world));
         if (resting && !dataTracker.get(NIGHT_REST)) {
@@ -387,6 +497,75 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
             setVelocity(getVelocity().multiply(0, 1, 0));
         }
         dataTracker.set(NIGHT_REST, resting);
+    }
+
+    /**
+     * A bird following its owner stays awake at night until the owner has stood still
+     * (or gone to bed) for about three seconds. Other birds always count as settled.
+     */
+    private boolean updateOwnerSettled(boolean night) {
+        LivingEntity owner = night && isTame() && getMode() == Mode.FOLLOW ? getOwner() : null;
+        if (owner == null || !owner.isAlive() || owner.getWorld() != getWorld()) {
+            ownerAnchor = null;
+            ownerStillTicks = 0;
+            return true;
+        }
+        Vec3d position = owner.getPos();
+        if (ownerAnchor == null || position.squaredDistanceTo(ownerAnchor) > OWNER_MOVED_DISTANCE_SQ) {
+            ownerAnchor = position;
+            ownerStillTicks = 0;
+        } else {
+            ownerStillTicks++;
+        }
+        // Give the bird time to walk over before it settles down next to its owner.
+        return ownerStillTicks >= OWNER_STILL_TICKS_TO_SLEEP
+                && (squaredDistanceTo(owner) <= SLEEP_NEAR_OWNER_DISTANCE_SQ
+                || ownerStillTicks >= OWNER_STILL_TICKS_TO_SLEEP_AWAY);
+    }
+
+    public boolean isAlarmed() {
+        return alarmTicks > 0;
+    }
+
+    @Nullable
+    public LivingEntity getThreat() {
+        return threat;
+    }
+
+    /** Stays awake while the attacker or any monster is close, then counts down to sleep. */
+    private void updateAlarm() {
+        if (alarmTicks <= 0) {
+            return;
+        }
+        if (threat != null && (!threat.isAlive() || threat.getWorld() != getWorld()
+                || squaredDistanceTo(threat) > THREAT_SAFE_DISTANCE_SQ)) {
+            threat = null;
+        }
+        if (threat == null && age % 10 == 0) {
+            threat = getWorld().getEntitiesByClass(HostileEntity.class,
+                            getBoundingBox().expand(HOSTILE_SCAN_RANGE), Entity::isAlive).stream()
+                    .min(Comparator.comparingDouble(this::squaredDistanceTo)).orElse(null);
+        }
+        if (threat != null) {
+            alarmTicks = Math.max(alarmTicks, ALARM_REFRESH_TICKS);
+        }
+        if (--alarmTicks == 0) {
+            threat = null;
+        }
+    }
+
+    @Override
+    public boolean damage(DamageSource source, float amount) {
+        boolean asleep = dataTracker.get(NIGHT_REST);
+        boolean hurt = super.damage(source, amount);
+        // A bird told to sit holds its place; one sleeping or wandering at night runs for safety.
+        if (hurt && !getWorld().isClient && isAlive() && getMode() != Mode.SIT && (asleep || isNight())) {
+            alarmTicks = ALARM_TICKS;
+            if (source.getAttacker() instanceof LivingEntity attacker && attacker != this) {
+                threat = attacker;
+            }
+        }
+        return hurt;
     }
 
     private boolean hasGroundUnderfoot(World world) {
@@ -555,7 +734,8 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
     @Override
     protected void updatePostDeath() {
         int animationTicks = isBaby() ? 50 : 65;
-        if (deathTime < animationTicks - 20) {
+        // Vanilla removes the body as soon as its counter reaches 20, so hand over on the last tick.
+        if (deathTime < animationTicks - 1) {
             deathTime++;
         } else {
             super.updatePostDeath();
