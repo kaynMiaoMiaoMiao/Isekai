@@ -33,7 +33,8 @@ import java.util.List;
 public class LandBirdEggBlockEntity extends BlockEntity implements GeoBlockEntity {
     private static final int HEAT_RADIUS = 3;
     private static final int HATCH_ANIMATION_TICKS = 59;
-    private static final int HATCH_RETRY_TICKS = 20;
+    /** Incubation is only re-evaluated once a second; the elapsed world time is credited in one go. */
+    private static final int CHECK_INTERVAL_TICKS = 20;
     private static final TagKey<Block> HEAT_SOURCES = TagKey.of(RegistryKeys.BLOCK, Isekai.id("egg_heat_sources"));
     private static final List<BlockPos> HEAT_OFFSETS = heatOffsets();
     private static final RawAnimation SHAKE = RawAnimation.begin().thenLoop("egg.interact");
@@ -41,7 +42,8 @@ public class LandBirdEggBlockEntity extends BlockEntity implements GeoBlockEntit
 
     private final AnimatableInstanceCache animationCache = GeckoLibUtil.createInstanceCache(this);
     private int incubationTicks;
-    private int hatchRetryTicks = HATCH_RETRY_TICKS;
+    /** World time of the last incubation check, or -1 before the first one. */
+    private long lastCheckTime = -1;
     private boolean incubating;
     private boolean hatching;
 
@@ -93,25 +95,42 @@ public class LandBirdEggBlockEntity extends BlockEntity implements GeoBlockEntit
     }
 
     private void tickServer(ServerWorld world, BlockPos pos, BlockState state) {
-        int incubationTargetTicks = IsekaiConfig.eggIncubationTicks();
-        if (incubationTicks >= incubationTargetTicks) {
-            if (--hatchRetryTicks == 0) {
-                hatchRetryTicks = HATCH_RETRY_TICKS;
-                hatch(world, pos);
-            }
+        long now = world.getTime();
+        // Stagger eggs across the second so they don't all check on the same tick.
+        if (lastCheckTime >= 0 && Math.floorMod(now + pos.asLong(), CHECK_INTERVAL_TICKS) != 0) {
+            return;
+        }
+        int target = IsekaiConfig.eggIncubationTicks();
+        if (incubationTicks >= target) {
+            lastCheckTime = now;
+            hatch(world, pos);
             return;
         }
         boolean heated = hasHeat(world, pos);
+        // World time keeps running while the chunk is unloaded, so the gap since the last check is
+        // credited as long as the egg was warm then and is still warm now.
+        long elapsed = lastCheckTime < 0 ? 0 : Math.max(0, now - lastCheckTime);
+        lastCheckTime = now;
         boolean changed = heated != incubating;
-        incubating = heated;
-        if (incubating) {
-            incubationTicks++;
-            world.markDirty(pos);
+        int before = incubationTicks;
+        if (heated && incubating && elapsed > 0) {
+            int animationStart = hatchAnimationStart(target);
+            long progressed = Math.min((long) target, before + elapsed);
+            // A long jump (e.g. after the chunk reloads) stops at the hatch animation so it still plays.
+            if (before < animationStart && progressed > animationStart) {
+                progressed = animationStart;
+            }
+            incubationTicks = (int) progressed;
         }
-        if (changed || (incubating && incubationTicks == hatchAnimationStart(incubationTargetTicks))) {
+        incubating = heated;
+        if (incubationTicks != before || changed) {
+            markDirty();
+        }
+        int animationStart = hatchAnimationStart(target);
+        if (changed || (before < animationStart && incubationTicks >= animationStart)) {
             world.updateListeners(pos, state, state, Block.NOTIFY_LISTENERS);
         }
-        if (incubationTicks == incubationTargetTicks) {
+        if (incubationTicks >= target) {
             hatch(world, pos);
         }
     }
@@ -165,13 +184,17 @@ public class LandBirdEggBlockEntity extends BlockEntity implements GeoBlockEntit
     protected void writeNbt(NbtCompound nbt) {
         super.writeNbt(nbt);
         nbt.putInt("IncubationTicks", incubationTicks);
+        nbt.putLong("LastCheckTime", lastCheckTime);
+        nbt.putBoolean("Warm", incubating);
     }
 
     @Override
     public void readNbt(NbtCompound nbt) {
         super.readNbt(nbt);
         incubationTicks = Math.max(0, nbt.getInt("IncubationTicks"));
-        incubating = nbt.getBoolean("Incubating");
+        lastCheckTime = nbt.contains("LastCheckTime") ? nbt.getLong("LastCheckTime") : -1;
+        // Server saves carry "Warm"; client sync packets carry "Incubating".
+        incubating = nbt.getBoolean(nbt.contains("Warm") ? "Warm" : "Incubating");
         hatching = nbt.getBoolean("Hatching");
     }
 

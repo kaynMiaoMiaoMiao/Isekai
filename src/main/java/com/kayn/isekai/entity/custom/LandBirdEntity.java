@@ -315,7 +315,9 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
 
     @Override
     public boolean isImmobile() {
-        return isSitting() || super.isImmobile();
+        // AbstractHorseEntity only freezes a dead horse while it is ridden and saddled, which lets the
+        // AI keep fleeing during our long death animation.
+        return isDead() || isSitting() || super.isImmobile();
     }
 
     @Override
