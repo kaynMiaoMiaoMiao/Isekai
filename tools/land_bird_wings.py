@@ -3,9 +3,10 @@
 
 Each wing keeps its original folded covert plane and gains two child bones:
 
-* ``<side>_wing_primaries`` - long flight feathers hinged at the wrist. Folded, they lie along the side
-  and cross over the tail like a resting bird's; animations swing them out into a wingtip fan.
-* ``<side>_wing_secondaries`` - trailing-edge feathers along the back of the wing.
+* ``<side>_wing_primaries`` - a broad hand of long flight feathers hinged at the wrist, with a band of
+  greater coverts over their bases. Folded, it lies along the side and crosses over the tail like a resting
+  bird's; animations swing it out into a wide, slotted wingtip.
+* ``<side>_wing_secondaries`` - a curtain of trailing-edge feathers along the back of the arm.
 
 The feathers are painted into unused texture space (x >= 128) of every adult texture, coloured from that
 plumage's existing wing so all six variants match. Re-running replaces the previous output.
@@ -31,11 +32,15 @@ VARIANTS = range(1, 7)
 PALETTE_SOURCE = (48, 0, 14, 13)
 
 # Feather planes in left-wing rest coordinates (model pixels). z grows toward the tail.
-PRIMARIES = {"x": 6.45, "y": (10.0, 16.0), "z": (-2.5, 17.5), "pivot": [6.3, 13.0, -1.5]}
-SECONDARIES = {"x": 6.15, "y": (13.0, 22.0), "z": (8.5, 15.5), "pivot": [6.3, 18.0, 10.0]}
+# Both sit just inside the covert plane (x 6.3), so folded the coverts lie over the flight feathers.
+PRIMARIES = {"x": 6.15, "y": (6.0, 19.0), "z": (-3.0, 21.0), "pivot": [6.2, 13.0, -1.5]}
+SECONDARIES = {"x": 6.0, "y": (11.0, 24.0), "z": (6.0, 17.0), "pivot": [6.2, 18.0, 8.0]}
+SIZES = {"primaries": (24, 13), "secondaries": (11, 13)}
 # Texture slots (u, v) for the outer and inner faces of each plane; right wing sits 32 px lower.
-SLOTS = {"primaries": ((128, 0), (128, 8)), "secondaries": ((152, 0), (152, 10))}
+SLOTS = {"primaries": ((0, 128), (0, 144)), "secondaries": ((32, 128), (48, 128))}
 RIGHT_V_OFFSET = 32
+# Earlier versions painted narrower feathers here; cleared so the texture holds no stale art.
+OLD_SLOTS = (128, 0, 48, 64)
 
 
 # ------------------------------------------------------------------ io
@@ -79,45 +84,65 @@ def shade(c, f):
     return tuple(max(0, min(255, int(v * f))) for v in c)
 
 
-def paint_feathers(length, height, feathers, pal, inner=False):
-    """A strip of overlapping feathers lying along +z (index 0 = front, tips toward the end).
+def paint_feathers(length, height, feathers, coverts, pal, inner=False):
+    """A fan of overlapping feathers lying along +z (index 0 = front/base, tips toward the end).
 
-    feathers: list of (row, thickness, start, tip) - rows from the top of the plane, start/tip along z.
-    Returns rows (top to bottom) of RGBA tuples, index 0 at the front.
+    feathers: list of (row, width, tip) - top row of the vane, its width, and where its tip ends along z.
+    coverts:  (length at the top row, length at the bottom row) of the covert band over the feather bases.
+    Returns rows (top to bottom) of RGBA tuples, index 0 at the base.
     """
     clear = (0, 0, 0, 0)
     img = [[clear] * length for _ in range(height)]
-    for row, thick, start, tip in feathers:
-        for z in range(start, tip):
-            t = (z - start) / max(1, tip - start - 1)        # 0 at the base, 1 at the tip
-            taper = 1 if tip - z <= 1 and thick > 1 else 0    # round the tip off by a pixel
-            for k in range(thick - taper):
+    for row, width, tip in feathers:
+        for z in range(tip):
+            t = z / max(1, tip - 1)                           # 0 at the base, 1 at the tip
+            left = tip - z                                    # pixels to the tip
+            # rounded, slightly pointed tip: the last pixels narrow toward the shaft
+            narrow = 2 if left == 1 else (1 if left == 2 else 0)
+            for k in range(width):
+                if k < narrow // 2 or k >= width - (narrow - narrow // 2):
+                    continue
                 y = row + k
                 if not 0 <= y < height:
                     continue
-                if k == thick - taper - 1:                    # lower edge of the vane: shadow line
-                    c = pal["outline"] if t > 0.15 else pal["dark"]
-                elif k == 0:                                  # shaft side: soft highlight
-                    c = pal["light"] if 0.2 < t < 0.7 else pal["mid"]
+                if k == 0:                                    # leading edge: thin highlight
+                    c = pal["light"] if t < 0.75 else pal["mid"]
+                elif k == width - 1:                          # trailing edge: shadow where the next one overlaps
+                    c = pal["outline"]
+                elif k == 1:                                  # shaft
+                    c = pal["shine"] if t < 0.5 else pal["light"]
                 else:
-                    c = pal["mid"] if t < 0.6 else pal["dark"]
-                if tip - z <= 2 and k != thick - taper - 1:   # darker feather tips
-                    c = pal["dark"]
-                img[y][z] = shade(c, 0.78) + (255,) if inner else c + (255,)
-    return img
+                    c = pal["mid"] if t < 0.55 else pal["dark"]
+                if left <= 3 and k != 1:                      # dark feather tips
+                    c = pal["dark"] if left == 3 else pal["outline"]
+                img[y][z] = c
+    top, bottom = coverts
+    for y in range(height):
+        end = round(top + (bottom - top) * y / max(1, height - 1))
+        for z in range(end):
+            scallop = (y % 3 == 2) and z == end - 1           # scalloped covert edge
+            if z == end - 1 or scallop:
+                c = pal["dark"]
+            elif (z + y) % 4 == 0:
+                c = pal["light"]
+            else:
+                c = pal["mid"] if z < end - 2 else pal["light"]
+            img[y][z] = c
+    return [[(shade(c, 0.72) if inner else c) + (255,) if c != clear else clear for c in r] for r in img]
 
 
 def primaries_image(pal, inner):
-    length, height = 20, 6
-    # Staggered: the lowest (outermost) feather is the longest.
-    feathers = [(0, 2, 0, 15), (1, 2, 0, 17), (3, 2, 0, 19), (4, 2, 1, 20)]
-    return paint_feathers(length, height, feathers, pal, inner)
+    length, height = SIZES["primaries"]
+    # Folded, row 0 sits against the arm and the lowest row hangs outermost; spread, the lower rows form
+    # the leading edge. The outer primaries are the longest, with gaps between the tips (slotted wingtip).
+    feathers = [(0, 3, 16), (2, 3, 18), (4, 3, 20), (6, 3, 22), (8, 3, 24), (10, 3, 23)]
+    return paint_feathers(length, height, feathers, (7, 5), pal, inner)
 
 
 def secondaries_image(pal, inner):
-    length, height = 7, 9
-    feathers = [(0, 2, 0, 5), (2, 2, 0, 6), (4, 2, 0, 7), (6, 2, 0, 6), (8, 1, 0, 4)]
-    return paint_feathers(length, height, feathers, pal, inner)
+    length, height = SIZES["secondaries"]
+    feathers = [(0, 3, 9), (2, 3, 10), (4, 3, 11), (6, 3, 11), (8, 3, 10), (10, 3, 9)]
+    return paint_feathers(length, height, feathers, (4, 3), pal, inner)
 
 
 def blit(px, w, u, v, img, reverse):
@@ -149,7 +174,8 @@ def feather_bones(side):
     sign = 1 if side == "left" else -1
     v_off = 0 if side == "left" else RIGHT_V_OFFSET
     bones = []
-    for name, spec, size in (("primaries", PRIMARIES, (20, 6)), ("secondaries", SECONDARIES, (7, 9))):
+    for name, spec in (("primaries", PRIMARIES), ("secondaries", SECONDARIES)):
+        size = SIZES[name]
         (ou, ov), (iu, iv) = SLOTS[name]
         pivot = list(spec["pivot"])
         pivot[0] *= sign
@@ -186,6 +212,10 @@ def main():
         w, h, px = read_png(tex_path)
         px = list(px)
         pal = palette((w, h, px))
+        u0, v0, cw, ch = OLD_SLOTS
+        for y in range(v0, v0 + ch):
+            for x in range(u0, u0 + cw):
+                px[y * w + x] = (0, 0, 0, 0)
         images = {
             ("primaries", False): primaries_image(pal, False),
             ("primaries", True): primaries_image(pal, True),

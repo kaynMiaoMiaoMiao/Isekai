@@ -136,7 +136,7 @@ def glide():
 
     return {"loop": True, "animation_length": length, "bones": {
         "left_wing": wing(1), "right_wing": wing(-1),
-        "left_wing_primaries": feathers(-52, 5, -0.15), "right_wing_primaries": feathers(-52, 5, -0.15),
+        "left_wing_primaries": feathers(-72, 4, -0.15), "right_wing_primaries": feathers(-72, 4, -0.15),
         "left_wing_secondaries": feathers(-12, 3, -0.2), "right_wing_secondaries": feathers(-12, 3, -0.2),
     }}
 
@@ -144,8 +144,8 @@ def glide():
 def flap(old):
     """Keeps the authored wing beat and opens the flight feathers on the downstroke."""
     length = old["animation_length"]
-    primaries = {"0.0": key([-30, 0, 0]), "0.06": key([-58, 0, 0]), "0.15": key([-52, 0, 0]),
-                 "0.28": key([-24, 0, 0]), time_key(length): key([-30, 0, 0])}
+    primaries = {"0.0": key([-40, 0, 0]), "0.06": key([-78, 0, 0]), "0.15": key([-70, 0, 0]),
+                 "0.28": key([-32, 0, 0]), time_key(length): key([-40, 0, 0])}
     secondaries = {"0.0": key([-8, 0, 0]), "0.15": key([-15, 0, 0]), time_key(length): key([-8, 0, 0])}
     bones = {name: old["bones"][name] for name in ("left_wing", "right_wing")}
     for side in ("left", "right"):

@@ -28,6 +28,19 @@ public final class IsekaiConfig {
     private static final String RIDING_WALK_SPEED_KEY = "ridingWalkSpeedPercent";
     private static final int DEFAULT_RIDING_WALK_SPEED = 40;
 
+    private static final String RIDING_SPRINT_SPEED_KEY = "ridingSprintSpeedPercent";
+    private static final int DEFAULT_RIDING_SPRINT_SPEED = 80;
+
+    private static final String GLIDE_SPEED_KEY = "glideSpeedPercent";
+    private static final int DEFAULT_GLIDE_SPEED = 120;
+    private static final int MAX_GLIDE_SPEED = 300;
+    // Blocks per second. The floor keeps the glide sinking faster than 1/32 block per tick, or the server
+    // kicks the rider for floating a vehicle.
+    private static final String GLIDE_FALL_SPEED_KEY = "glideFallSpeed";
+    private static final double DEFAULT_GLIDE_FALL_SPEED = 1.44;
+    private static final double MIN_GLIDE_FALL_SPEED = 0.7;
+    private static final double MAX_GLIDE_FALL_SPEED = 60.0;
+
     private static final String SPAWN_WEIGHT_KEY = "spawnWeight";
     private static final int DEFAULT_SPAWN_WEIGHT = 3;
     private static final String SPAWN_MIN_KEY = "spawnMinGroupSize";
@@ -49,6 +62,9 @@ public final class IsekaiConfig {
     private static int eggIncubationSeconds = DEFAULT_EGG_SECONDS;
     private static int tameChancePercent = DEFAULT_TAME_CHANCE;
     private static int ridingWalkSpeedPercent = DEFAULT_RIDING_WALK_SPEED;
+    private static int ridingSprintSpeedPercent = DEFAULT_RIDING_SPRINT_SPEED;
+    private static int glideSpeedPercent = DEFAULT_GLIDE_SPEED;
+    private static double glideFallSpeed = DEFAULT_GLIDE_FALL_SPEED;
     private static int spawnWeight = DEFAULT_SPAWN_WEIGHT;
     private static int spawnMinGroupSize = DEFAULT_SPAWN_MIN;
     private static int spawnMaxGroupSize = DEFAULT_SPAWN_MAX;
@@ -76,6 +92,10 @@ public final class IsekaiConfig {
         eggIncubationSeconds = readInt(properties, EGG_INCUBATION_KEY, DEFAULT_EGG_SECONDS, 1, MAX_EGG_SECONDS);
         tameChancePercent = readInt(properties, TAME_CHANCE_KEY, DEFAULT_TAME_CHANCE, 0, 100);
         ridingWalkSpeedPercent = readInt(properties, RIDING_WALK_SPEED_KEY, DEFAULT_RIDING_WALK_SPEED, 1, 100);
+        ridingSprintSpeedPercent = readInt(properties, RIDING_SPRINT_SPEED_KEY, DEFAULT_RIDING_SPRINT_SPEED, 1, 200);
+        glideSpeedPercent = readInt(properties, GLIDE_SPEED_KEY, DEFAULT_GLIDE_SPEED, 1, MAX_GLIDE_SPEED);
+        glideFallSpeed = readDouble(properties, GLIDE_FALL_SPEED_KEY, DEFAULT_GLIDE_FALL_SPEED,
+                MIN_GLIDE_FALL_SPEED, MAX_GLIDE_FALL_SPEED);
         spawnWeight = readInt(properties, SPAWN_WEIGHT_KEY, DEFAULT_SPAWN_WEIGHT, 0, 1_000);
         spawnMinGroupSize = readInt(properties, SPAWN_MIN_KEY, DEFAULT_SPAWN_MIN, 1, 16);
         spawnMaxGroupSize = readInt(properties, SPAWN_MAX_KEY, DEFAULT_SPAWN_MAX, 1, 16);
@@ -97,7 +117,7 @@ public final class IsekaiConfig {
 
     private static List<String> allKeys() {
         List<String> keys = new ArrayList<>(List.of(EGG_INCUBATION_KEY, TAME_CHANCE_KEY, RIDING_WALK_SPEED_KEY,
-                SPAWN_WEIGHT_KEY, SPAWN_MIN_KEY, SPAWN_MAX_KEY));
+                RIDING_SPRINT_SPEED_KEY, GLIDE_SPEED_KEY, GLIDE_FALL_SPEED_KEY, SPAWN_WEIGHT_KEY, SPAWN_MIN_KEY, SPAWN_MAX_KEY));
         for (int plumage = 1; plumage <= LandBirdEntity.PLUMAGE_COUNT; plumage++) {
             keys.add(biomesKey(plumage));
         }
@@ -108,6 +128,16 @@ public final class IsekaiConfig {
         return read(properties, key, Integer.toString(fallback), text -> {
             int value = Integer.parseInt(text.trim());
             if (value < min || value > max) {
+                throw new IllegalArgumentException(key + " must be between " + min + " and " + max);
+            }
+            return value;
+        });
+    }
+
+    private static double readDouble(Properties properties, String key, double fallback, double min, double max) {
+        return read(properties, key, Double.toString(fallback), text -> {
+            double value = Double.parseDouble(text.trim());
+            if (!(value >= min && value <= max)) {
                 throw new IllegalArgumentException(key + " must be between " + min + " and " + max);
             }
             return value;
@@ -133,8 +163,17 @@ public final class IsekaiConfig {
         out.append(EGG_INCUBATION_KEY).append('=').append(eggIncubationSeconds).append("\n\n");
         out.append("# Chance (0-100) that one carrot tames a wild land bird.\n");
         out.append(TAME_CHANCE_KEY).append('=').append(tameChancePercent).append("\n\n");
-        out.append("# Riding speed without the sprint key, as a percentage (1-100) of sprinting speed.\n");
-        out.append(RIDING_WALK_SPEED_KEY).append('=').append(ridingWalkSpeedPercent).append("\n\n");
+        out.append("# Riding speeds as percentages of the bird's base speed. Walking never outpaces sprinting.\n");
+        out.append("# Without the sprint key (1-100).\n");
+        out.append(RIDING_WALK_SPEED_KEY).append('=').append(ridingWalkSpeedPercent).append('\n');
+        out.append("# With the sprint key: top running speed (1-200).\n");
+        out.append(RIDING_SPRINT_SPEED_KEY).append('=').append(ridingSprintSpeedPercent).append("\n\n");
+        out.append("# Gliding (hold jump in the air while riding). Plain falls drop at normal speed.\n");
+        out.append("# Glide flying speed, as a percentage (1-" + MAX_GLIDE_SPEED + ") of the normal riding speed (walking or sprinting).\n");
+        out.append(GLIDE_SPEED_KEY).append('=').append(glideSpeedPercent).append('\n');
+        out.append("# Glide sinking speed in blocks per second (")
+                .append(MIN_GLIDE_FALL_SPEED).append('-').append(MAX_GLIDE_FALL_SPEED).append("). Lower glides further.\n");
+        out.append(GLIDE_FALL_SPEED_KEY).append('=').append(glideFallSpeed).append("\n\n");
         out.append("# Natural spawning. Weight 0 disables it. For reference, horses use weight 5 in plains.\n");
         out.append(SPAWN_WEIGHT_KEY).append('=').append(spawnWeight).append('\n');
         out.append(SPAWN_MIN_KEY).append('=').append(spawnMinGroupSize).append('\n');
@@ -180,6 +219,19 @@ public final class IsekaiConfig {
 
     public static int ridingWalkSpeedPercent() {
         return ridingWalkSpeedPercent;
+    }
+
+    public static int ridingSprintSpeedPercent() {
+        return ridingSprintSpeedPercent;
+    }
+
+    public static int glideSpeedPercent() {
+        return glideSpeedPercent;
+    }
+
+    /** Glide sinking speed in blocks per tick. */
+    public static double glideFallSpeedPerTick() {
+        return glideFallSpeed / 20.0;
     }
 
     public static int spawnWeight() {

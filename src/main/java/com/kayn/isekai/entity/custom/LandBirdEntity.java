@@ -100,11 +100,9 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
     private static final double SEAT_CLEARANCE = 0.5 / 16.0 * ADULT_MODEL_SCALE;
     private static final float SEAT_SMOOTHING = 0.2f;
     private static final double SADDLE_SEAT_BACK = 5.0 / 16.0;
-    // Falling birds spread their wings: plain falls are capped at SLOW_FALL_SPEED, and a rider holding jump
-    // glides at GLIDE_FALL_SPEED (blocks/tick). The glide must keep sinking faster than 1/32 block per tick,
-    // or the server kicks the rider for floating a vehicle.
+    // A falling bird without a rider spreads its wings and drifts down no faster than this (blocks/tick).
+    // Ridden birds keep their wings folded and drop at full speed unless the rider glides.
     private static final double SLOW_FALL_SPEED = 0.22;
-    private static final double GLIDE_FALL_SPEED = 0.06;
     private static final int DAY_TICKS = 24_000;
     private static final int NIGHT_START = 13_000;
     private static final int NIGHT_END = 23_000;
@@ -384,8 +382,13 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
     @Override
     protected float getSaddledSpeed(PlayerEntity rider) {
         float speed = (float) getAttributeValue(EntityAttributes.GENERIC_MOVEMENT_SPEED);
-        // Riders walk at a configurable share of full speed and sprint (sprint key) at full speed.
-        return rider.isSprinting() ? speed : speed * IsekaiConfig.ridingWalkSpeedPercent() / 100.0f;
+        // Walking and sprinting (sprint key) are configurable shares of the base speed; walking never
+        // outpaces sprinting.
+        float sprint = speed * IsekaiConfig.ridingSprintSpeedPercent() / 100.0f;
+        float riding = rider.isSprinting() ? sprint
+                : Math.min(sprint, speed * IsekaiConfig.ridingWalkSpeedPercent() / 100.0f);
+        // Gliding scales the walking or sprinting speed by a configurable percentage.
+        return isGlidingNow() ? riding * IsekaiConfig.glideSpeedPercent() / 100.0f : riding;
     }
 
     /** Ridden birds sprint when the rider does; others sprint once they move fast enough. */
@@ -578,6 +581,11 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
         forwardSpeed += (along - forwardSpeed) * SPEED_SMOOTHING;
         seatBack += (targetSeatBack() - seatBack) * SEAT_SMOOTHING;
         updateGliding();
+        // Spread wings break the fall: only the height dropped with folded wings counts when landing. This runs
+        // on both sides, because the server tracks a ridden bird's fall from the rider's movement packets.
+        if (isGlidingNow() || isSlowFalling()) {
+            fallDistance = 0;
+        }
         if (babyReactionTicks > 0 && --babyReactionTicks == 0) {
             dataTracker.set(BABY_REACTION, NO_REACTION);
         }
@@ -619,14 +627,27 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
     @Override
     public void travel(Vec3d movementInput) {
         super.travel(movementInput);
-        // Spread wings: a falling bird drifts down instead of dropping, and glides while its rider holds jump.
-        if (isAlive() && !isOnGround() && !isTouchingWater() && !isInLava() && !hasNoGravity() && !isClimbing()) {
+        // A rider holding jump glides at the configured rate; a ridden bird otherwise drops at full speed,
+        // while a bird on its own spreads its wings and drifts down.
+        if (isGlidingNow() || isSlowFalling()) {
             Vec3d velocity = getVelocity();
-            double limit = isRiderHoldingJump() ? -GLIDE_FALL_SPEED : -SLOW_FALL_SPEED;
+            double limit = isGlidingNow() ? -IsekaiConfig.glideFallSpeedPerTick() : -SLOW_FALL_SPEED;
             if (velocity.y < limit) {
                 setVelocity(velocity.x, limit, velocity.z);
             }
         }
+    }
+
+    /** A rider holding jump in the air: the wings are spread and hold the fall back. */
+    private boolean isGlidingNow() {
+        return isAlive() && isRiderHoldingJump() && !isOnGround() && !isTouchingWater() && !isInLava()
+                && !hasNoGravity() && !isClimbing();
+    }
+
+    /** Falling with no rider: the wings open on their own. */
+    private boolean isSlowFalling() {
+        return isAlive() && getControllingPassenger() == null && !isOnGround() && !isTouchingWater()
+                && !isInLava() && !hasNoGravity() && !isClimbing();
     }
 
     @Override
@@ -641,11 +662,9 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
 
     @Override
     public boolean handleFallDamage(float fallDistance, float damageMultiplier, DamageSource damageSource) {
-        // The wings break every fall, so neither the bird nor its rider takes fall damage.
-        if (fallDistance > 1.0f) {
-            playSound(IsekaiSound.LAND_BIRD_LAND, 0.4f, 1.0f);
-        }
-        return false;
+        // Falls with folded wings hurt the bird and its rider as they would a horse (the landing sound is swapped
+        // in playSound). Gliding and slow falling reset fallDistance every tick, so they land safely.
+        return super.handleFallDamage(fallDistance, damageMultiplier, damageSource);
     }
 
     private boolean isNight() {
@@ -975,13 +994,19 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
         body.setSoundKeyframeHandler(event -> onSoundKeyframe(event.getKeyframeData().getSound()));
         controllers.add(body);
         // Layered on top of the body animation: only the wing bones move. Rising or a rider holding jump
-        // flaps; otherwise the wings stay spread in a glide.
+        // flaps; a bird on its own spreads its wings to glide down, while a ridden one keeps them folded.
         AnimationController<LandBirdEntity> wings = new AnimationController<>(this, "wings", 4, state -> {
             if (isBaby() || isDead() || isSitting() || !isAirborne()) {
                 return PlayState.STOP;
             }
             boolean rising = getY() - prevY > 0.02;
-            return state.setAndContinue(isFlapping() || rising ? ADULT_FLAP : ADULT_GLIDE);
+            if (isFlapping() || rising) {
+                return state.setAndContinue(ADULT_FLAP);
+            }
+            if (getControllingPassenger() != null) {
+                return PlayState.STOP;
+            }
+            return state.setAndContinue(ADULT_GLIDE);
         });
         wings.setSoundKeyframeHandler(event -> onSoundKeyframe(event.getKeyframeData().getSound()));
         controllers.add(wings);
