@@ -2,6 +2,7 @@ package com.kayn.isekai.entity.client;
 
 import com.kayn.isekai.Isekai;
 import com.kayn.isekai.entity.custom.LandBirdEntity;
+import net.minecraft.client.render.RenderLayer;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.MathHelper;
 import software.bernie.geckolib.constant.DataTickets;
@@ -43,6 +44,15 @@ public class LandBirdModel extends GeoModel<LandBirdEntity> {
         return assetsFor(entity).animations();
     }
 
+    /**
+     * Back-face culled, unlike GeckoLib's default no-cull type. The feather planes are zero-thickness cubes
+     * whose front and back faces share one plane; drawing both makes them z-fight and flicker.
+     */
+    @Override
+    public RenderLayer getRenderType(LandBirdEntity animatable, Identifier texture) {
+        return RenderLayer.getEntityCutout(texture);
+    }
+
     @Override
     public void setCustomAnimations(LandBirdEntity entity, long instanceId, AnimationState<LandBirdEntity> state) {
         if (entity.isDead()) {
@@ -57,6 +67,10 @@ public class LandBirdModel extends GeoModel<LandBirdEntity> {
             float pitch = MathHelper.clamp(look.headPitch(), -MAX_HEAD_PITCH, MAX_HEAD_PITCH);
             head.setRotX(head.getRotX() + pitch * MathHelper.RADIANS_PER_DEGREE);
             head.setRotY(head.getRotY() + yaw * MathHelper.RADIANS_PER_DEGREE);
+            // The setters above mark the bone as animated. When the current animation has no head keys
+            // (sit), that marker would make GeckoLib skip resetting the bone next frame, so the look offset
+            // would pile up every frame and spin the head. Clear it so the bone starts from its rest pose.
+            head.resetStateChanges();
         }
     }
 
