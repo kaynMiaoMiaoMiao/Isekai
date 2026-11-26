@@ -25,6 +25,9 @@ public final class IsekaiConfig {
     private static final String TAME_CHANCE_KEY = "tameChancePercent";
     private static final int DEFAULT_TAME_CHANCE = 15;
 
+    private static final String RIDING_WALK_SPEED_KEY = "ridingWalkSpeedPercent";
+    private static final int DEFAULT_RIDING_WALK_SPEED = 40;
+
     private static final String SPAWN_WEIGHT_KEY = "spawnWeight";
     private static final int DEFAULT_SPAWN_WEIGHT = 3;
     private static final String SPAWN_MIN_KEY = "spawnMinGroupSize";
@@ -45,6 +48,7 @@ public final class IsekaiConfig {
 
     private static int eggIncubationSeconds = DEFAULT_EGG_SECONDS;
     private static int tameChancePercent = DEFAULT_TAME_CHANCE;
+    private static int ridingWalkSpeedPercent = DEFAULT_RIDING_WALK_SPEED;
     private static int spawnWeight = DEFAULT_SPAWN_WEIGHT;
     private static int spawnMinGroupSize = DEFAULT_SPAWN_MIN;
     private static int spawnMaxGroupSize = DEFAULT_SPAWN_MAX;
@@ -71,6 +75,7 @@ public final class IsekaiConfig {
 
         eggIncubationSeconds = readInt(properties, EGG_INCUBATION_KEY, DEFAULT_EGG_SECONDS, 1, MAX_EGG_SECONDS);
         tameChancePercent = readInt(properties, TAME_CHANCE_KEY, DEFAULT_TAME_CHANCE, 0, 100);
+        ridingWalkSpeedPercent = readInt(properties, RIDING_WALK_SPEED_KEY, DEFAULT_RIDING_WALK_SPEED, 1, 100);
         spawnWeight = readInt(properties, SPAWN_WEIGHT_KEY, DEFAULT_SPAWN_WEIGHT, 0, 1_000);
         spawnMinGroupSize = readInt(properties, SPAWN_MIN_KEY, DEFAULT_SPAWN_MIN, 1, 16);
         spawnMaxGroupSize = readInt(properties, SPAWN_MAX_KEY, DEFAULT_SPAWN_MAX, 1, 16);
@@ -91,7 +96,7 @@ public final class IsekaiConfig {
     }
 
     private static List<String> allKeys() {
-        List<String> keys = new ArrayList<>(List.of(EGG_INCUBATION_KEY, TAME_CHANCE_KEY,
+        List<String> keys = new ArrayList<>(List.of(EGG_INCUBATION_KEY, TAME_CHANCE_KEY, RIDING_WALK_SPEED_KEY,
                 SPAWN_WEIGHT_KEY, SPAWN_MIN_KEY, SPAWN_MAX_KEY));
         for (int plumage = 1; plumage <= LandBirdEntity.PLUMAGE_COUNT; plumage++) {
             keys.add(biomesKey(plumage));
@@ -128,6 +133,8 @@ public final class IsekaiConfig {
         out.append(EGG_INCUBATION_KEY).append('=').append(eggIncubationSeconds).append("\n\n");
         out.append("# Chance (0-100) that one carrot tames a wild land bird.\n");
         out.append(TAME_CHANCE_KEY).append('=').append(tameChancePercent).append("\n\n");
+        out.append("# Riding speed without the sprint key, as a percentage (1-100) of sprinting speed.\n");
+        out.append(RIDING_WALK_SPEED_KEY).append('=').append(ridingWalkSpeedPercent).append("\n\n");
         out.append("# Natural spawning. Weight 0 disables it. For reference, horses use weight 5 in plains.\n");
         out.append(SPAWN_WEIGHT_KEY).append('=').append(spawnWeight).append('\n');
         out.append(SPAWN_MIN_KEY).append('=').append(spawnMinGroupSize).append('\n');
@@ -169,6 +176,10 @@ public final class IsekaiConfig {
 
     public static int tameChancePercent() {
         return tameChancePercent;
+    }
+
+    public static int ridingWalkSpeedPercent() {
+        return ridingWalkSpeedPercent;
     }
 
     public static int spawnWeight() {

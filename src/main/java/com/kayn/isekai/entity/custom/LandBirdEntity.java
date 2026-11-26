@@ -85,7 +85,6 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
     public static final float BABY_MODEL_SCALE = 0.72f;
     // Type dimensions are 1.0 x 1.85; this yields a chicken-sized 0.38 x 0.70 hitbox.
     private static final float BABY_HITBOX_SCALE = 0.7f / 1.85f;
-    private static final float BABY_WALK_MIN_STRIDE = 0.025f;
     private static final double SADDLE_SEAT_HEIGHT = 24.6 / 16.0;
     private static final double SADDLE_SEAT_BACK = 5.0 / 16.0;
     private static final int DAY_TICKS = 24_000;
@@ -131,8 +130,6 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
     private static final RawAnimation ADULT_FLAP = RawAnimation.begin().thenLoop("adult.flap");
     // Ticks off the ground before the wings start flapping, so stepping up a block does not trigger it.
     private static final int FLAP_AIR_TICKS = 3;
-    // A rider walks at this share of full speed and sprints (sprint key) at full speed.
-    private static final float RIDDEN_WALK_SPEED_FACTOR = 0.3f;
     // Ground speed (blocks per tick) each gait was authored for; playback scales to the real speed
     // so the planted foot does not slide. Walk: 15px stride per 0.375s stance, sprint: 14px per 0.1575s.
     private static final float WALK_DESIGN_SPEED = 0.100f;
@@ -143,8 +140,13 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
     private static final double MIN_GAIT_PLAYBACK = 0.5;
     private static final double MAX_WALK_PLAYBACK = 2.0;
     private static final double MAX_SPRINT_PLAYBACK = 2.5;
+    // Chick gaits, authored the same way on the 0.72-scale juvenile model.
+    private static final float BABY_WALK_DESIGN_SPEED = 0.055f;
+    private static final float BABY_RUN_DESIGN_SPEED = 0.113f;
+    private static final float BABY_RUN_SPEED_THRESHOLD = 0.09f;
     private static final RawAnimation BABY_IDLE = RawAnimation.begin().thenLoop("baby.idle");
     private static final RawAnimation BABY_WALK = RawAnimation.begin().thenLoop("baby.walk");
+    private static final RawAnimation BABY_RUN = RawAnimation.begin().thenLoop("baby.run");
     private static final RawAnimation BABY_FEED = RawAnimation.begin().thenPlay("baby.feed");
     private static final RawAnimation BABY_HAPPY = RawAnimation.begin().thenPlay("baby.happy");
     private static final RawAnimation BABY_SIT = RawAnimation.begin().thenLoop("baby.sit");
@@ -342,7 +344,8 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
     @Override
     protected float getSaddledSpeed(PlayerEntity rider) {
         float speed = (float) getAttributeValue(EntityAttributes.GENERIC_MOVEMENT_SPEED);
-        return rider.isSprinting() ? speed : speed * RIDDEN_WALK_SPEED_FACTOR;
+        // Riders walk at a configurable share of full speed and sprint (sprint key) at full speed.
+        return rider.isSprinting() ? speed : speed * IsekaiConfig.ridingWalkSpeedPercent() / 100.0f;
     }
 
     /** Ridden birds sprint when the rider does; others sprint once they move fast enough. */
@@ -787,12 +790,14 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
     @Override
     public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
         controllers.add(new AnimationController<>(this, "bird", 4, state -> {
-            RawAnimation animation = selectAnimation(state.getLimbSwingAmount());
+            RawAnimation animation = selectAnimation();
             double playback = 1.0;
-            if (animation == ADULT_WALK) {
-                playback = MathHelper.clamp(groundSpeed / WALK_DESIGN_SPEED, MIN_GAIT_PLAYBACK, MAX_WALK_PLAYBACK);
-            } else if (animation == ADULT_SPRINT) {
-                playback = MathHelper.clamp(groundSpeed / SPRINT_DESIGN_SPEED, MIN_GAIT_PLAYBACK, MAX_SPRINT_PLAYBACK);
+            if (animation == ADULT_WALK || animation == BABY_WALK) {
+                float design = animation == ADULT_WALK ? WALK_DESIGN_SPEED : BABY_WALK_DESIGN_SPEED;
+                playback = MathHelper.clamp(groundSpeed / design, MIN_GAIT_PLAYBACK, MAX_WALK_PLAYBACK);
+            } else if (animation == ADULT_SPRINT || animation == BABY_RUN) {
+                float design = animation == ADULT_SPRINT ? SPRINT_DESIGN_SPEED : BABY_RUN_DESIGN_SPEED;
+                playback = MathHelper.clamp(groundSpeed / design, MIN_GAIT_PLAYBACK, MAX_SPRINT_PLAYBACK);
             }
             state.getController().setAnimationSpeed(playback);
             return state.setAndContinue(animation);
@@ -806,7 +811,7 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
         }));
     }
 
-    private RawAnimation selectAnimation(float stride) {
+    private RawAnimation selectAnimation() {
         if (isDead()) {
             return isBaby() ? BABY_DEATH : ADULT_DEATH;
         }
@@ -814,8 +819,8 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
             return isBaby() ? BABY_SIT : ADULT_SIT;
         }
         if (isBaby()) {
-            if (stride > BABY_WALK_MIN_STRIDE) {
-                return BABY_WALK;
+            if (groundSpeed >= STANDING_SPEED) {
+                return groundSpeed >= BABY_RUN_SPEED_THRESHOLD ? BABY_RUN : BABY_WALK;
             }
             return switch (dataTracker.get(BABY_REACTION)) {
                 case FEED_REACTION -> BABY_FEED;
