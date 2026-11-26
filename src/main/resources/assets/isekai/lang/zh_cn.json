@@ -13,5 +13,13 @@
   "mode.isekai.land_bird.sit": "坐下",
   "mode.isekai.land_bird.follow": "跟随",
   "message.isekai.land_bird.mode": "陆行鸟状态：%s",
-  "message.isekai.land_bird_egg.progress": "孵化进度：%s / %s 秒"
+  "message.isekai.land_bird_egg.progress": "孵化进度：%s / %s 秒",
+  "subtitles.isekai.entity.land_bird.ambient": "陆行鸟：咕噜",
+  "subtitles.isekai.entity.land_bird.hurt": "陆行鸟：受伤",
+  "subtitles.isekai.entity.land_bird.death": "陆行鸟：死亡",
+  "subtitles.isekai.entity.land_bird.angry": "陆行鸟：发怒",
+  "subtitles.isekai.entity.land_bird.eat": "陆行鸟：进食",
+  "subtitles.isekai.entity.land_bird.step": "陆行鸟：脚步声",
+  "subtitles.isekai.entity.land_bird.jump": "陆行鸟：振翅",
+  "subtitles.isekai.entity.land_bird.land": "陆行鸟：落地"
 }

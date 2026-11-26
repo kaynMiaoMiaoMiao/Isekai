@@ -3,6 +3,8 @@ package com.kayn.isekai.entity.custom;
 import com.kayn.isekai.entity.IsekaiEntity;
 import com.kayn.isekai.entity.ai.LandBirdFollowOwnerGoal;
 import com.kayn.isekai.item.IsekaiItem;
+import com.kayn.isekai.sound.IsekaiSound;
+import net.minecraft.block.BlockState;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityData;
 import net.minecraft.entity.EntityType;
@@ -42,6 +44,7 @@ import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.world.EntityView;
@@ -507,27 +510,46 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
 
     @Override
     protected SoundEvent getAmbientSound() {
-        return SoundEvents.ENTITY_HORSE_AMBIENT;
+        return IsekaiSound.LAND_BIRD_AMBIENT;
     }
 
     @Override
     protected SoundEvent getDeathSound() {
-        return SoundEvents.ENTITY_HORSE_DEATH;
+        return IsekaiSound.LAND_BIRD_DEATH;
     }
 
     @Override
     protected SoundEvent getEatSound() {
-        return SoundEvents.ENTITY_HORSE_EAT;
+        return IsekaiSound.LAND_BIRD_EAT;
     }
 
     @Override
     protected SoundEvent getHurtSound(DamageSource source) {
-        return SoundEvents.ENTITY_HORSE_HURT;
+        return IsekaiSound.LAND_BIRD_HURT;
     }
 
     @Override
     protected SoundEvent getAngrySound() {
-        return SoundEvents.ENTITY_HORSE_ANGRY;
+        return IsekaiSound.LAND_BIRD_ANGRY;
+    }
+
+    @Override
+    protected void playStepSound(BlockPos pos, BlockState state) {
+        // Replaces the horse's hoof, gallop and breathing sounds with clawed footsteps.
+        if (!state.isLiquid()) {
+            playSound(IsekaiSound.LAND_BIRD_STEP, hasPassengers() ? 0.3f : 0.15f, 1.0f);
+        }
+    }
+
+    @Override
+    protected void playJumpSound() {
+        playSound(IsekaiSound.LAND_BIRD_JUMP, 0.4f, 1.0f);
+    }
+
+    @Override
+    public void playSound(SoundEvent sound, float volume, float pitch) {
+        // AbstractHorseEntity#handleFallDamage hardcodes the horse landing sound.
+        super.playSound(sound == SoundEvents.ENTITY_HORSE_LAND ? IsekaiSound.LAND_BIRD_LAND : sound, volume, pitch);
     }
 
     @Override

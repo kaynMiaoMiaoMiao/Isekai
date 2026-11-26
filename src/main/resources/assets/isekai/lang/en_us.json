@@ -13,5 +13,13 @@
   "mode.isekai.land_bird.sit": "Sitting",
   "mode.isekai.land_bird.follow": "Following",
   "message.isekai.land_bird.mode": "Land bird mode: %s",
-  "message.isekai.land_bird_egg.progress": "Incubation: %s / %s seconds"
+  "message.isekai.land_bird_egg.progress": "Incubation: %s / %s seconds",
+  "subtitles.isekai.entity.land_bird.ambient": "Land Bird warbles",
+  "subtitles.isekai.entity.land_bird.hurt": "Land Bird hurts",
+  "subtitles.isekai.entity.land_bird.death": "Land Bird dies",
+  "subtitles.isekai.entity.land_bird.angry": "Land Bird hisses",
+  "subtitles.isekai.entity.land_bird.eat": "Land Bird eats",
+  "subtitles.isekai.entity.land_bird.step": "Footsteps",
+  "subtitles.isekai.entity.land_bird.jump": "Land Bird flaps",
+  "subtitles.isekai.entity.land_bird.land": "Land Bird lands"
 }
