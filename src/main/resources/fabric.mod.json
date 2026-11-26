@@ -2,7 +2,7 @@
 	"schemaVersion": 1,
 	"id": "isekai",
 	"version": "${version}",
-	"name": "Isekai",
+	"name": "Isekai Creatures",
 	"description": "A Fabric mod featuring land birds, tameable and breedable mounts.",
 	"authors": [
 		"kayn"

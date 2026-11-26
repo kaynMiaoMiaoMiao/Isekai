@@ -1,13 +1,13 @@
 <p align="center">
-	<img alt="Isekai logo" src="src/main/resources/assets/isekai/icon.png">
+	<img alt="Isekai Creatures logo" src="src/main/resources/assets/isekai/icon.png">
 </p>
-<h1 align="center" style="margin: 30px 0 30px; font-weight: bold;">Isekai</h1>
-<h4 align="center">Isekai</h4>
+<h1 align="center" style="margin: 30px 0 30px; font-weight: bold;">异界幻想生物</h1>
+<h4 align="center">Isekai Creatures</h4>
 
 ## 简介
 Make Isekai great again!
 
-Isekai 是 Minecraft 1.20.1 的 Fabric 模组，加入了坐骑「陆行鸟」、刷怪蛋、孵化蛋和格拉姆硬币。
+异界幻想生物（Isekai Creatures）是 Minecraft 1.20.1 的 Fabric 模组，加入了坐骑「陆行鸟」、刷怪蛋、孵化蛋和格拉姆硬币。
 
 ## 陆行鸟
 
@@ -18,7 +18,7 @@ Isekai 是 Minecraft 1.20.1 的 Fabric 模组，加入了坐骑「陆行鸟」�
   - 翠绿：平原、向日葵平原、森林、繁花森林、桦木森林、稀疏丛林
   - 墨黑：黑森林、沼泽、红树林沼泽
   - 银蓝：雪原、积雪针叶林、冰刺之地、雪林
-- 也可以在「异界生活幻想」创造模式标签页使用「陆行鸟刷怪蛋」，或用 `/summon isekai:land_bird` 召唤。`/summon isekai:land_bird ~ ~ ~ {Plumage:6}` 可指定颜色。
+- 也可以在「异界幻想生物」创造模式标签页使用「陆行鸟刷怪蛋」，或用 `/summon isekai:land_bird` 召唤。`/summon isekai:land_bird ~ ~ ~ {Plumage:6}` 可指定颜色。
 - 手持胡萝卜右键野生陆行鸟，每根有 15% 概率驯服（可配置）；失败会冒烟。驯服的成年陆行鸟可骑乘，装上马鞍后可以控制移动和跳跃。骑乘时正常前进是「行走」（默认为疾跑速度的 40%，可配置），按疾跑键（或双击前进）是「疾跑」（满速）。骑乘疾跑不受饥饿值限制，撞墙或松开前进键会停止疾跑。上鸟后按背包键可打开坐骑装备栏。
 - 喂食：胡萝卜给受伤的陆行鸟 10 秒生命恢复（可叠加到 60 秒）；金胡萝卜直接回满血。给驯服的幼鸟喂胡萝卜或金胡萝卜，每次让它提前 50 秒长大。
 - 手持胡萝卜或金胡萝卜可以引诱附近清醒的陆行鸟。成鸟装备马铠会显示对应材质，皮革马铠支持染色。
@@ -31,7 +31,7 @@ Isekai 是 Minecraft 1.20.1 的 Fabric 模组，加入了坐骑「陆行鸟」�
 
 ## 孵化蛋
 
-- 「异界生活幻想」创造模式标签页有六种颜色的陆行鸟蛋，生存模式可通过繁殖获得。
+- 「异界幻想生物」创造模式标签页有六种颜色的陆行鸟蛋，生存模式可通过繁殖获得。
 - 放下蛋后，在三格距离内有点燃的营火、火、灵魂火、熔岩或岩浆块时会累计孵化时间。远离热源会暂停，累计达到设定时长后会孵出同色幼鸟，蛋上方需要留出空间。
 - 空手右键蛋可以查看状态：孵化进度和剩余时间、缺少热源，或者蛋上方被挡住无法破壳。
 - 受热时蛋会循环晃动，暂停孵化时会静止。孵化完成前会播放破壳动画。

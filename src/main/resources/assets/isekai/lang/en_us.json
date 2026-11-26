@@ -1,7 +1,7 @@
 {
   "item.isekai.gramme_coin": "Gramme Coin",
   "item.isekai.land_bird_spawn_egg": "Land Bird Spawn Egg",
-  "itemGroup.isekai": "Isekai",
+  "itemGroup.isekai": "Isekai Creatures",
   "entity.isekai.land_bird": "Land Bird",
   "block.isekai.land_bird_egg": "Orange Land Bird Egg",
   "block.isekai.land_bird_egg_2": "Navy Land Bird Egg",
@@ -28,5 +28,7 @@
   "message.isekai.land_bird_egg.hatching": "About to hatch!",
   "message.isekai.land_bird_egg.blocked": "Ready to hatch, but the space above the egg is blocked. Clear the block on top of it",
   "message.isekai.duration.minutes": "%sm %ss",
-  "message.isekai.duration.seconds": "%ss"
+  "message.isekai.duration.seconds": "%ss",
+  "modmenu.nameTranslation.isekai": "Isekai Creatures",
+  "modmenu.descriptionTranslation.isekai": "Adds land birds you can tame, breed and ride."
 }
