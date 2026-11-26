@@ -69,6 +69,7 @@ import software.bernie.geckolib.core.animatable.instance.AnimatableInstanceCache
 import software.bernie.geckolib.core.animation.AnimatableManager;
 import software.bernie.geckolib.core.animation.AnimationController;
 import software.bernie.geckolib.core.animation.RawAnimation;
+import software.bernie.geckolib.core.object.PlayState;
 import software.bernie.geckolib.util.GeckoLibUtil;
 
 import java.util.ArrayList;
@@ -127,6 +128,21 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
     private static final RawAnimation ADULT_SPRINT = RawAnimation.begin().thenLoop("adult.sprint");
     private static final RawAnimation ADULT_SIT = RawAnimation.begin().thenLoop("adult.sit");
     private static final RawAnimation ADULT_DEATH = RawAnimation.begin().thenPlayAndHold("adult.death");
+    private static final RawAnimation ADULT_FLAP = RawAnimation.begin().thenLoop("adult.flap");
+    // Ticks off the ground before the wings start flapping, so stepping up a block does not trigger it.
+    private static final int FLAP_AIR_TICKS = 3;
+    // A rider walks at this share of full speed and sprints (sprint key) at full speed.
+    private static final float RIDDEN_WALK_SPEED_FACTOR = 0.3f;
+    // Ground speed (blocks per tick) each gait was authored for; playback scales to the real speed
+    // so the planted foot does not slide. Walk: 15px stride per 0.375s stance, sprint: 14px per 0.1575s.
+    private static final float WALK_DESIGN_SPEED = 0.100f;
+    private static final float SPRINT_DESIGN_SPEED = 0.222f;
+    // Without a rider the gait follows speed: wandering walks, following or fleeing sprints.
+    private static final float SPRINT_SPEED_THRESHOLD = 0.15f;
+    private static final float STANDING_SPEED = 0.008f;
+    private static final double MIN_GAIT_PLAYBACK = 0.5;
+    private static final double MAX_WALK_PLAYBACK = 2.0;
+    private static final double MAX_SPRINT_PLAYBACK = 2.5;
     private static final RawAnimation BABY_IDLE = RawAnimation.begin().thenLoop("baby.idle");
     private static final RawAnimation BABY_WALK = RawAnimation.begin().thenLoop("baby.walk");
     private static final RawAnimation BABY_FEED = RawAnimation.begin().thenPlay("baby.feed");
@@ -136,6 +152,8 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
 
     private final AnimatableInstanceCache animationCache = GeckoLibUtil.createInstanceCache(this);
     private int babyReactionTicks;
+    private int airTicks;
+    private float groundSpeed;
     @Nullable
     private Vec3d ownerAnchor;
     private int ownerStillTicks;
@@ -316,6 +334,26 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
     }
 
     @Override
+    public boolean canSprintAsVehicle() {
+        // Lets the rider's sprint key work while mounted, as it does for camels.
+        return true;
+    }
+
+    @Override
+    protected float getSaddledSpeed(PlayerEntity rider) {
+        float speed = (float) getAttributeValue(EntityAttributes.GENERIC_MOVEMENT_SPEED);
+        return rider.isSprinting() ? speed : speed * RIDDEN_WALK_SPEED_FACTOR;
+    }
+
+    /** Ridden birds sprint when the rider does; others sprint once they move fast enough. */
+    private boolean isSprintGait() {
+        if (getControllingPassenger() instanceof PlayerEntity rider) {
+            return rider.isSprinting();
+        }
+        return groundSpeed >= SPRINT_SPEED_THRESHOLD;
+    }
+
+    @Override
     public double getMountedHeightOffset() {
         return SADDLE_SEAT_HEIGHT * ADULT_MODEL_SCALE;
     }
@@ -473,6 +511,10 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
             updateNightRest();
         }
         super.tick();
+        airTicks = isOnGround() || isTouchingWater() || hasVehicle() ? 0 : airTicks + 1;
+        double dx = getX() - prevX;
+        double dz = getZ() - prevZ;
+        groundSpeed += ((float) Math.sqrt(dx * dx + dz * dz) - groundSpeed) * 0.35f;
         if (babyReactionTicks > 0 && --babyReactionTicks == 0) {
             dataTracker.set(BABY_REACTION, NO_REACTION);
         }
@@ -744,12 +786,27 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
 
     @Override
     public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
-        controllers.add(new AnimationController<>(
-                this, "bird", 0, state -> state.setAndContinue(selectAnimation(
-                        state.isMoving(), state.getLimbSwingAmount()))));
+        controllers.add(new AnimationController<>(this, "bird", 4, state -> {
+            RawAnimation animation = selectAnimation(state.getLimbSwingAmount());
+            double playback = 1.0;
+            if (animation == ADULT_WALK) {
+                playback = MathHelper.clamp(groundSpeed / WALK_DESIGN_SPEED, MIN_GAIT_PLAYBACK, MAX_WALK_PLAYBACK);
+            } else if (animation == ADULT_SPRINT) {
+                playback = MathHelper.clamp(groundSpeed / SPRINT_DESIGN_SPEED, MIN_GAIT_PLAYBACK, MAX_SPRINT_PLAYBACK);
+            }
+            state.getController().setAnimationSpeed(playback);
+            return state.setAndContinue(animation);
+        }));
+        // Layered on top of the body animation: only the wing bones move, so the legs keep running.
+        controllers.add(new AnimationController<>(this, "wings", 3, state -> {
+            if (isBaby() || isDead() || isSitting() || airTicks < FLAP_AIR_TICKS) {
+                return PlayState.STOP;
+            }
+            return state.setAndContinue(ADULT_FLAP);
+        }));
     }
 
-    private RawAnimation selectAnimation(boolean moving, float stride) {
+    private RawAnimation selectAnimation(float stride) {
         if (isDead()) {
             return isBaby() ? BABY_DEATH : ADULT_DEATH;
         }
@@ -766,10 +823,10 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
                 default -> BABY_IDLE;
             };
         }
-        if (!moving) {
+        if (groundSpeed < STANDING_SPEED) {
             return ADULT_IDLE;
         }
-        return stride >= 0.9f ? ADULT_SPRINT : ADULT_WALK;
+        return isSprintGait() ? ADULT_SPRINT : ADULT_WALK;
     }
 
     @Override
