@@ -665,10 +665,18 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
         };
     }
 
-    /** Called to its owner: wakes up if asleep and runs over. A bird told to sit stays put. */
+    /**
+     * Called to its owner: wakes up if asleep and runs over. A bird told to sit gets up and switches to following,
+     * since one that sat back down on arrival could not be ridden.
+     */
     private void onSummoned(PlayerEntity player, double speed) {
-        if (getMode() == Mode.SIT || hasPassengers() || !isAlive()) {
+        if (hasPassengers() || !isAlive()) {
             return;
+        }
+        if (getMode() == Mode.SIT) {
+            dataTracker.set(MODE, Mode.FOLLOW.ordinal());
+            player.sendMessage(Text.translatable("message.isekai_creature.yokibird.mode",
+                    Text.translatable(Mode.FOLLOW.translationKey)), true);
         }
         summoner = player;
         summonSpeed = speed;
