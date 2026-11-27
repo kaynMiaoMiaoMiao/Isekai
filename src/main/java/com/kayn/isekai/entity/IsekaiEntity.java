@@ -21,7 +21,7 @@ public final class IsekaiEntity {
 
     public static final EntityType<LandBirdEntity> LAND_BIRD = Registry.register(
             Registries.ENTITY_TYPE,
-            Isekai.id("land_bird"),
+            Isekai.id("yokibird"),
             FabricEntityTypeBuilder.<LandBirdEntity>createMob()
                     .spawnGroup(SpawnGroup.CREATURE)
                     .entityFactory(LandBirdEntity::new)

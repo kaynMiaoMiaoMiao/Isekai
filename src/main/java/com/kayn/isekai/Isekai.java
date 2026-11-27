@@ -11,7 +11,7 @@ import net.minecraft.util.Identifier;
 
 public class Isekai implements ModInitializer {
 
-    public static final String MOD_ID = "isekai";
+    public static final String MOD_ID = "isekai_creature";
 
     public static Identifier id(String path) {
         return new Identifier(MOD_ID, path);

@@ -22,7 +22,7 @@ repositories {
 }
 
 loom {
-	accessWidenerPath = file("src/main/resources/isekai.accesswidener")
+	accessWidenerPath = file("src/main/resources/isekai_creature.accesswidener")
 }
 
 fabricApi {

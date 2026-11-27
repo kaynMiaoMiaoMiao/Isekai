@@ -21,7 +21,7 @@ import zlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-ASSETS = ROOT / "src/main/resources/assets/isekai"
+ASSETS = ROOT / "src/main/resources/assets/isekai_creature"
 MODEL_SCALE = {"adult": 0.8, "baby": 0.72}
 
 

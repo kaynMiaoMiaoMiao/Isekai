@@ -1,9 +1,9 @@
 {
 	"schemaVersion": 1,
-	"id": "isekai",
+	"id": "isekai_creature",
 	"version": "${version}",
-	"name": "Isekai Creatures",
-	"description": "A Fabric mod featuring land birds, tameable and breedable mounts.",
+	"name": "Isekai Creature",
+	"description": "A Fabric mod featuring yokibirds: tameable, breedable and rideable mounts.",
 	"authors": [
 		"kayn"
 	],
@@ -11,9 +11,9 @@
 		"sources": "https://github.com/kaynMiaoMiaoMiao/Isekai"
 	},
 	"license": "CC0-1.0",
-	"icon": "assets/isekai/icon.png",
+	"icon": "assets/isekai_creature/icon.png",
 	"environment": "*",
-	"accessWidener": "isekai.accesswidener",
+	"accessWidener": "isekai_creature.accesswidener",
 	"entrypoints": {
 		"main": [
 			"com.kayn.isekai.Isekai"

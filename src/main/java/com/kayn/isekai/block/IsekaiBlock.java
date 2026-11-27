@@ -23,15 +23,18 @@ public final class IsekaiBlock {
                     .toList();
 
     public static final BlockEntityType<LandBirdEggBlockEntity> LAND_BIRD_EGG = Registry.register(
-            Registries.BLOCK_ENTITY_TYPE, Isekai.id("land_bird_egg"),
+            Registries.BLOCK_ENTITY_TYPE, Isekai.id("yokibird_egg"),
             FabricBlockEntityTypeBuilder.create(LandBirdEggBlockEntity::new,
                     LAND_BIRD_EGGS.toArray(Block[]::new)).build());
 
     private IsekaiBlock() {
     }
 
+    /** Egg colour suffixes, index 0 = plumage 1. */
+    private static final String[] EGG_COLORS = {"orange", "blue", "brown", "green", "black", "white"};
+
     public static String eggPath(int plumage) {
-        return plumage == 1 ? "land_bird_egg" : "land_bird_egg_" + plumage;
+        return "yokibird_egg_" + EGG_COLORS[plumage - 1];
     }
 
     public static void initialize() {

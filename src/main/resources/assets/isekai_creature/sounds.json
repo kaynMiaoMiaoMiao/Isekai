@@ -1,0 +1,38 @@
+{
+  "entity.yokibird.ambient": {
+    "subtitle": "subtitles.isekai_creature.entity.yokibird.ambient",
+    "sounds": ["isekai_creature:entity/yokibird/ambient1", "isekai_creature:entity/yokibird/ambient2", "isekai_creature:entity/yokibird/ambient3", "isekai_creature:entity/yokibird/ambient4", "isekai_creature:entity/yokibird/ambient5"]
+  },
+  "entity.yokibird.hurt": {
+    "subtitle": "subtitles.isekai_creature.entity.yokibird.hurt",
+    "sounds": ["isekai_creature:entity/yokibird/hurt1", "isekai_creature:entity/yokibird/hurt2"]
+  },
+  "entity.yokibird.death": {
+    "subtitle": "subtitles.isekai_creature.entity.yokibird.death",
+    "sounds": ["isekai_creature:entity/yokibird/death"]
+  },
+  "entity.yokibird.angry": {
+    "subtitle": "subtitles.isekai_creature.entity.yokibird.angry",
+    "sounds": ["isekai_creature:entity/yokibird/angry1", "isekai_creature:entity/yokibird/angry2"]
+  },
+  "entity.yokibird.eat": {
+    "subtitle": "subtitles.isekai_creature.entity.yokibird.eat",
+    "sounds": ["isekai_creature:entity/yokibird/eat1", "isekai_creature:entity/yokibird/eat2"]
+  },
+  "entity.yokibird.step": {
+    "subtitle": "subtitles.isekai_creature.entity.yokibird.step",
+    "sounds": ["isekai_creature:entity/yokibird/step1", "isekai_creature:entity/yokibird/step2", "isekai_creature:entity/yokibird/step3", "isekai_creature:entity/yokibird/step4"]
+  },
+  "entity.yokibird.jump": {
+    "subtitle": "subtitles.isekai_creature.entity.yokibird.jump",
+    "sounds": ["isekai_creature:entity/yokibird/jump"]
+  },
+  "entity.yokibird.land": {
+    "subtitle": "subtitles.isekai_creature.entity.yokibird.land",
+    "sounds": ["isekai_creature:entity/yokibird/land"]
+  },
+  "entity.yokibird.flap": {
+    "subtitle": "subtitles.isekai_creature.entity.yokibird.flap",
+    "sounds": ["isekai_creature:entity/yokibird/flap1", "isekai_creature:entity/yokibird/flap2", "isekai_creature:entity/yokibird/flap3"]
+  }
+}

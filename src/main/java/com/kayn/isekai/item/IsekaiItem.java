@@ -16,7 +16,7 @@ public final class IsekaiItem {
     public static final Item GRAMME_COIN = register("gramme_coin", new Item(new Item.Settings()));
 
     public static final Item LAND_BIRD_SPAWN_EGG = register(
-            "land_bird_spawn_egg",
+            "yokibird_spawn_egg",
             new SpawnEggItem(IsekaiEntity.LAND_BIRD, 0xF8F8FF, 0xE3773F, new Item.Settings())
     );
 

@@ -27,7 +27,7 @@ from pathlib import Path
 
 SR = 44100
 ROOT = Path(__file__).resolve().parent.parent
-OUT_DIR = ROOT / "src/main/resources/assets/isekai/sounds/entity/land_bird"
+OUT_DIR = ROOT / "src/main/resources/assets/isekai_creature/sounds/entity/yokibird"
 
 
 # ---------------------------------------------------------------- primitives

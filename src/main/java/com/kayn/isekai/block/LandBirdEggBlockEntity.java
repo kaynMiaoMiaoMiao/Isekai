@@ -63,25 +63,25 @@ public class LandBirdEggBlockEntity extends BlockEntity implements GeoBlockEntit
         boolean roomToHatch = createChick(world, pos) != null;
         if (ticks >= target) {
             return roomToHatch
-                    ? Text.translatable("message.isekai.land_bird_egg.hatching")
-                    : Text.translatable("message.isekai.land_bird_egg.blocked");
+                    ? Text.translatable("message.isekai_creature.yokibird_egg.hatching")
+                    : Text.translatable("message.isekai_creature.yokibird_egg.blocked");
         }
         if (!incubating) {
             return ticks == 0
-                    ? Text.translatable("message.isekai.land_bird_egg.cold")
-                    : Text.translatable("message.isekai.land_bird_egg.paused", percent);
+                    ? Text.translatable("message.isekai_creature.yokibird_egg.cold")
+                    : Text.translatable("message.isekai_creature.yokibird_egg.paused", percent);
         }
         Text remaining = formatDuration((target - ticks + 19) / 20);
         return roomToHatch
-                ? Text.translatable("message.isekai.land_bird_egg.progress", percent, remaining)
-                : Text.translatable("message.isekai.land_bird_egg.progress_blocked", percent, remaining);
+                ? Text.translatable("message.isekai_creature.yokibird_egg.progress", percent, remaining)
+                : Text.translatable("message.isekai_creature.yokibird_egg.progress_blocked", percent, remaining);
     }
 
     private static Text formatDuration(int seconds) {
         int minutes = seconds / 60;
         return minutes > 0
-                ? Text.translatable("message.isekai.duration.minutes", minutes, seconds % 60)
-                : Text.translatable("message.isekai.duration.seconds", seconds);
+                ? Text.translatable("message.isekai_creature.duration.minutes", minutes, seconds % 60)
+                : Text.translatable("message.isekai_creature.duration.seconds", seconds);
     }
 
     private static int hatchAnimationStart(int incubationTargetTicks) {

@@ -8,15 +8,15 @@ import net.minecraft.util.Identifier;
 
 public final class IsekaiSound {
 
-    public static final SoundEvent LAND_BIRD_AMBIENT = register("entity.land_bird.ambient");
-    public static final SoundEvent LAND_BIRD_HURT = register("entity.land_bird.hurt");
-    public static final SoundEvent LAND_BIRD_DEATH = register("entity.land_bird.death");
-    public static final SoundEvent LAND_BIRD_ANGRY = register("entity.land_bird.angry");
-    public static final SoundEvent LAND_BIRD_EAT = register("entity.land_bird.eat");
-    public static final SoundEvent LAND_BIRD_STEP = register("entity.land_bird.step");
-    public static final SoundEvent LAND_BIRD_JUMP = register("entity.land_bird.jump");
-    public static final SoundEvent LAND_BIRD_LAND = register("entity.land_bird.land");
-    public static final SoundEvent LAND_BIRD_FLAP = register("entity.land_bird.flap");
+    public static final SoundEvent LAND_BIRD_AMBIENT = register("entity.yokibird.ambient");
+    public static final SoundEvent LAND_BIRD_HURT = register("entity.yokibird.hurt");
+    public static final SoundEvent LAND_BIRD_DEATH = register("entity.yokibird.death");
+    public static final SoundEvent LAND_BIRD_ANGRY = register("entity.yokibird.angry");
+    public static final SoundEvent LAND_BIRD_EAT = register("entity.yokibird.eat");
+    public static final SoundEvent LAND_BIRD_STEP = register("entity.yokibird.step");
+    public static final SoundEvent LAND_BIRD_JUMP = register("entity.yokibird.jump");
+    public static final SoundEvent LAND_BIRD_LAND = register("entity.yokibird.land");
+    public static final SoundEvent LAND_BIRD_FLAP = register("entity.yokibird.flap");
 
     private IsekaiSound() {
     }

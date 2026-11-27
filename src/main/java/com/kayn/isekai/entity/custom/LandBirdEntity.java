@@ -24,6 +24,8 @@ import net.minecraft.entity.ai.goal.LookAroundGoal;
 import net.minecraft.entity.ai.goal.SwimGoal;
 import net.minecraft.entity.ai.goal.TemptGoal;
 import net.minecraft.entity.ai.goal.WanderAroundFarGoal;
+import net.minecraft.entity.ai.pathing.EntityNavigation;
+import net.minecraft.entity.ai.pathing.MobNavigation;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.mob.HostileEntity;
@@ -111,6 +113,12 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
     private static final int OWNER_STILL_TICKS_TO_SLEEP_AWAY = 200;
     private static final double OWNER_MOVED_DISTANCE_SQ = 0.5 * 0.5;
     private static final double SLEEP_NEAR_OWNER_DISTANCE_SQ = 4.0 * 4.0;
+    // Whistled for (Callable Horses): wakes up and runs over, giving up after this long.
+    private static final int SUMMON_TIMEOUT_TICKS = 600;
+    private static final double SUMMON_ARRIVE_DISTANCE_SQ = 3.0 * 3.0;
+    // After arriving it stays up this long, so the caller has time to mount before it dozes off again.
+    private static final int SUMMON_STAY_AWAKE_TICKS = 200;
+    private static final int SUMMON_REPATH_TICKS = 10;
     private static final int ALARM_TICKS = 100;
     private static final int ALARM_REFRESH_TICKS = 40;
     private static final double THREAT_SAFE_DISTANCE_SQ = 12.0 * 12.0;
@@ -197,6 +205,13 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
     private int alarmTicks;
     @Nullable
     private LivingEntity threat;
+    // True while this bird runs its own tick, so navigation calls from elsewhere can be told apart.
+    private boolean ticking;
+    @Nullable
+    private PlayerEntity summoner;
+    private double summonSpeed;
+    private int summonTicks;
+    private int summonAwakeTicks;
 
     public LandBirdEntity(EntityType<? extends LandBirdEntity> type, World world) {
         super(type, world);
@@ -224,6 +239,40 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
 
             @Override
             public void start() {
+                getNavigation().stop();
+            }
+        });
+        goalSelector.add(1, new Goal() {
+            private int repathTicks;
+
+            {
+                setControls(EnumSet.of(Control.MOVE, Control.LOOK));
+            }
+
+            @Override
+            public boolean canStart() {
+                return summoner != null;
+            }
+
+            @Override
+            public void start() {
+                repathTicks = 0;
+            }
+
+            @Override
+            public void tick() {
+                if (summoner == null) {
+                    return;
+                }
+                getLookControl().lookAt(summoner);
+                if (--repathTicks <= 0) {
+                    repathTicks = getTickCount(SUMMON_REPATH_TICKS);
+                    getNavigation().startMovingTo(summoner, summonSpeed);
+                }
+            }
+
+            @Override
+            public void stop() {
                 getNavigation().stop();
             }
         });
@@ -551,7 +600,7 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
             removeAllPassengers();
             setVelocity(getVelocity().multiply(0, 1, 0));
         }
-        player.sendMessage(Text.translatable("message.isekai.land_bird.mode",
+        player.sendMessage(Text.translatable("message.isekai_creature.yokibird.mode",
                 Text.translatable(mode.translationKey)), true);
     }
 
@@ -568,7 +617,17 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
 
     @Override
     public void tick() {
+        ticking = true;
+        try {
+            tickBird();
+        } finally {
+            ticking = false;
+        }
+    }
+
+    private void tickBird() {
         if (!getWorld().isClient) {
+            updateSummon();
             updateNightRest();
         }
         super.tick();
@@ -589,6 +648,55 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
         if (babyReactionTicks > 0 && --babyReactionTicks == 0) {
             dataTracker.set(BABY_REACTION, NO_REACTION);
         }
+    }
+
+    @Override
+    protected EntityNavigation createNavigation(World world) {
+        return new MobNavigation(this, world) {
+            @Override
+            public boolean startMovingTo(Entity target, double speed) {
+                // Our own goals path from inside tick(). A call from outside it that sends the bird to a player is
+                // Callable Horses answering its owner's whistle.
+                if (!ticking && target instanceof PlayerEntity player && !getWorld().isClient) {
+                    onSummoned(player, speed);
+                }
+                return super.startMovingTo(target, speed);
+            }
+        };
+    }
+
+    /** Called to its owner: wakes up if asleep and runs over. A bird told to sit stays put. */
+    private void onSummoned(PlayerEntity player, double speed) {
+        if (getMode() == Mode.SIT || hasPassengers() || !isAlive()) {
+            return;
+        }
+        summoner = player;
+        summonSpeed = speed;
+        summonTicks = SUMMON_TIMEOUT_TICKS;
+        summonAwakeTicks = 0;
+        ownerAnchor = null;
+        ownerStillTicks = 0;
+        dataTracker.set(NIGHT_REST, false);
+    }
+
+    private void updateSummon() {
+        if (summoner == null) {
+            if (summonAwakeTicks > 0) {
+                summonAwakeTicks--;
+            }
+            return;
+        }
+        if (--summonTicks <= 0 || !summoner.isAlive() || summoner.isSpectator() || summoner.getWorld() != getWorld()
+                || hasPassengers() || hasVehicle() || getMode() == Mode.SIT) {
+            summoner = null;
+        } else if (squaredDistanceTo(summoner) <= SUMMON_ARRIVE_DISTANCE_SQ) {
+            summoner = null;
+            summonAwakeTicks = SUMMON_STAY_AWAKE_TICKS;
+        }
+    }
+
+    private boolean isAnsweringCall() {
+        return summoner != null || summonAwakeTicks > 0;
     }
 
     private boolean isAirborne() {
@@ -678,7 +786,7 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
         updateAlarm();
         boolean night = isNight();
         boolean ownerSettled = updateOwnerSettled(night);
-        boolean resting = night && ownerSettled && !isAlarmed()
+        boolean resting = night && ownerSettled && !isAlarmed() && !isAnsweringCall()
                 && !isTouchingWater() && !isInLava() && !hasPassengers() && !hasVehicle()
                 && (isOnGround() || hasGroundUnderfoot(world));
         if (resting && !dataTracker.get(NIGHT_REST)) {
@@ -1063,9 +1171,9 @@ public class LandBirdEntity extends AbstractHorseEntity implements GeoEntity {
     }
 
     public enum Mode {
-        ROAM("mode.isekai.land_bird.roam"),
-        SIT("mode.isekai.land_bird.sit"),
-        FOLLOW("mode.isekai.land_bird.follow");
+        ROAM("mode.isekai_creature.yokibird.roam"),
+        SIT("mode.isekai_creature.yokibird.sit"),
+        FOLLOW("mode.isekai_creature.yokibird.follow");
 
         private static final Mode[] VALUES = values();
         private final String translationKey;

@@ -16,7 +16,9 @@ import java.util.function.Function;
 
 public final class IsekaiConfig {
     private static final Logger LOGGER = LoggerFactory.getLogger(IsekaiConfig.class);
-    private static final String FILE_NAME = "isekai.properties";
+    private static final String FILE_NAME = "isekai_creature.properties";
+    /** Name used before the mod was renamed; its values are carried over once. */
+    private static final String LEGACY_FILE_NAME = "isekai.properties";
 
     private static final String EGG_INCUBATION_KEY = "eggIncubationSeconds";
     private static final int DEFAULT_EGG_SECONDS = 1_200;
@@ -78,14 +80,19 @@ public final class IsekaiConfig {
     }
 
     public static void load() {
-        Path path = FabricLoader.getInstance().getConfigDir().resolve(FILE_NAME);
+        Path configDir = FabricLoader.getInstance().getConfigDir();
+        Path path = configDir.resolve(FILE_NAME);
         Properties properties = new Properties();
         boolean exists = Files.exists(path);
-        if (exists) {
-            try (var reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
+        Path source = exists ? path : configDir.resolve(LEGACY_FILE_NAME);
+        if (Files.exists(source)) {
+            try (var reader = Files.newBufferedReader(source, StandardCharsets.UTF_8)) {
                 properties.load(reader);
+                if (!exists) {
+                    LOGGER.info("Migrating settings from {} to {}.", source, path);
+                }
             } catch (IOException exception) {
-                LOGGER.warn("Could not read {}. Using defaults.", path, exception);
+                LOGGER.warn("Could not read {}. Using defaults.", source, exception);
             }
         }
 
@@ -158,10 +165,10 @@ public final class IsekaiConfig {
 
     private static void save(Path path) {
         StringBuilder out = new StringBuilder();
-        out.append("# Isekai config. Restart the game or server to apply changes.\n\n");
-        out.append("# Seconds of heat required to hatch a land bird egg.\n");
+        out.append("# Isekai Creature config. Restart the game or server to apply changes.\n\n");
+        out.append("# Seconds of heat required to hatch a yokibird egg.\n");
         out.append(EGG_INCUBATION_KEY).append('=').append(eggIncubationSeconds).append("\n\n");
-        out.append("# Chance (0-100) that one carrot tames a wild land bird.\n");
+        out.append("# Chance (0-100) that one carrot tames a wild yokibird.\n");
         out.append(TAME_CHANCE_KEY).append('=').append(tameChancePercent).append("\n\n");
         out.append("# Riding speeds as percentages of the bird's base speed. Walking never outpaces sprinting.\n");
         out.append("# Without the sprint key (1-100).\n");

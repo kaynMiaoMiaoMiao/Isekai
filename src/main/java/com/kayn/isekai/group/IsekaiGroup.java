@@ -13,8 +13,8 @@ public final class IsekaiGroup {
     }
 
     public static void initialize() {
-        Registry.register(Registries.ITEM_GROUP, Isekai.id("isekai"), FabricItemGroup.builder()
-                .displayName(Text.translatable("itemGroup.isekai"))
+        Registry.register(Registries.ITEM_GROUP, Isekai.id("isekai_creature"), FabricItemGroup.builder()
+                .displayName(Text.translatable("itemGroup.isekai_creature"))
                 .icon(IsekaiItem.GRAMME_COIN::getDefaultStack)
                 .entries((context, entries) -> {
                     entries.add(IsekaiItem.GRAMME_COIN);
